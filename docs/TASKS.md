@@ -124,7 +124,7 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T11: Iframe rendering + postMessage (L) [WS-C] ← T04 (done)
+- [ ] T12: Completion signaling (L) [WS-C] ← T09, T11 (both done)
 
 ---
 
@@ -167,13 +167,13 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > Iframe rendering in the chat experience. Requires WebSocket chat for message flow.
 
-- [ ] T11: Iframe rendering + postMessage — AppRenderer component, sandboxed iframe (allow-scripts allow-forms allow-popups, NO allow-same-origin), JSON-RPC 2.0 postMessage protocol, origin validation, iframe_ready handshake with invocation buffering, 10s load timeout (L) [WS-C] ← T04
+- [x] T11: Iframe rendering + postMessage — AppRenderer component, sandboxed iframe (allow-scripts allow-forms allow-popups, NO allow-same-origin), JSON-RPC 2.0 postMessage protocol, origin validation, iframe_ready handshake with invocation buffering, 10s load timeout (L) [WS-C] ← T04 — done 2026-04-02
 
 ## Layer 6 — Tool Router (deadline: Early Fri)
 
 > Server-side orchestration layer. Requires tool discovery, state machine, and intent service.
 
-- [ ] T09: Tool router — full invocation lifecycle: validate tool exists, check circuit breaker, create tool_log (pending), set intent, manage app_session (single-active-app), dispatch to client via WS, await result with 15s timeout, update tool_log, hallucinated tool handling with 2-retry limit, rate limiting (10/min/user) (XL) [WS-B] ← T07, T08, T10
+- [x] T09: Tool router — full invocation lifecycle: validate tool exists, check circuit breaker, create tool_log (pending), set intent, manage app_session (single-active-app), dispatch to client via WS, await result with 15s timeout, update tool_log, hallucinated tool handling with 2-retry limit, rate limiting (10/min/user) (XL) [WS-B] ← T07, T08, T10 — done 2026-04-02
 
 ## Layer 7 — Completion Signaling (deadline: Early Fri)
 
