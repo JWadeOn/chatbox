@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Native Development Workflow</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF9F6;
+    --bg-card: #FFFFFF;
+    --bg-subtle: #F3F1EC;
+    --text: #1A1A18;
+    --text-secondary: #6B6A65;
+    --text-tertiary: #9C9B95;
+    --border: #E2E0D8;
+    --border-light: #EDEBE4;
+
+    --teal-50: #E1F5EE; --teal-100: #9FE1CB; --teal-600: #0F6E56; --teal-800: #085041;
+    --purple-50: #EEEDFE; --purple-100: #CECBF6; --purple-600: #534AB7; --purple-800: #3C3489;
+    --blue-50: #E6F1FB; --blue-100: #B5D4F4; --blue-600: #185FA5; --blue-800: #0C447C;
+    --coral-50: #FAECE7; --coral-100: #F5C4B3; --coral-600: #993C1D; --coral-800: #712B13;
+    --amber-50: #FAEEDA; --amber-100: #FAC775; --amber-600: #854F0B; --amber-800: #633806;
+    --gray-50: #F1EFE8; --gray-100: #D3D1C7; --gray-600: #5F5E5A; --gray-800: #444441;
+    --rose-50: #FDE8EC; --rose-100: #F9B8C4; --rose-600: #A8294A; --rose-800: #7D1D36;
+
+    --arrow: #B4B2A9;
+    --dash: #C8A84E;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413;
+      --bg-card: #1E1E1C;
+      --bg-subtle: #242422;
+      --text: #E8E6DE;
+      --text-secondary: #9C9B95;
+      --text-tertiary: #6B6A65;
+      --border: #333330;
+      --border-light: #2A2A28;
+
+      --teal-50: #085041; --teal-100: #0F6E56; --teal-600: #5DCAA5; --teal-800: #9FE1CB;
+      --purple-50: #26215C; --purple-100: #3C3489; --purple-600: #AFA9EC; --purple-800: #CECBF6;
+      --blue-50: #042C53; --blue-100: #0C447C; --blue-600: #85B7EB; --blue-800: #B5D4F4;
+      --coral-50: #4A1B0C; --coral-100: #712B13; --coral-600: #F0997B; --coral-800: #F5C4B3;
+      --amber-50: #412402; --amber-100: #633806; --amber-600: #EF9F27; --amber-800: #FAC775;
+      --gray-50: #2C2C2A; --gray-100: #444441; --gray-600: #B4B2A9; --gray-800: #D3D1C7;
+      --rose-50: #4A0E1E; --rose-100: #7D1D36; --rose-600: #F27A94; --rose-800: #F9B8C4;
+
+      --arrow: #5F5E5A;
+      --dash: #BA7517;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 48px 24px 80px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 56px;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+  }
+  .header p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 32px;
+    padding: 4px;
+    background: var(--bg-subtle);
+    border-radius: 10px;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .mode-toggle button {
+    flex: 1;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+  .mode-toggle button.active {
+    background: var(--bg-card);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .mode-toggle button:hover:not(.active) {
+    color: var(--text);
+  }
+
+  /* Pipeline formula */
+  .pipeline-formula {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+    padding: 16px 20px;
+    background: var(--bg-subtle);
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+  }
+  .pipeline-formula .step {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text);
+    padding: 3px 8px;
+    background: var(--bg-card);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .pipeline-formula .arrow-text {
+    color: var(--text-tertiary);
+    font-size: 14px;
+  }
+  .pipeline-formula .branch {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+  }
+  .pipeline-formula .branch-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pipeline-formula .bracket {
+    font-size: 20px;
+    color: var(--text-tertiary);
+    line-height: 1;
+    font-weight: 300;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .section-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-secondary);
+  }
+  .section-header .desc {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+  }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    gap: 12px;
+  }
+  .cards.pipeline { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .cards.two-col { grid-template-columns: repeat(2, 1fr); }
+  .cards.three-col { grid-template-columns: repeat(3, 1fr); }
+  .cards.dev { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .cards.maint { grid-template-columns: repeat(2, 1fr); }
+  .cards.single { grid-template-columns: 1fr; max-width: 480px; }
+
+  /* Card */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    position: relative;
+    transition: border-color 0.2s, transform 0.15s;
+    cursor: default;
+  }
+  .card:hover {
+    border-color: var(--arrow);
+    transform: translateY(-1px);
+  }
+
+  .card .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 400;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  .card h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+  }
+
+  .card .question {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    font-style: italic;
+  }
+
+  .card .detail {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+  }
+
+  .card .filename {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  /* Color variants for badges */
+  .badge-teal    { background: var(--teal-50);   color: var(--teal-800);   border: 1px solid var(--teal-100); }
+  .badge-purple  { background: var(--purple-50); color: var(--purple-800); border: 1px solid var(--purple-100); }
+  .badge-blue    { background: var(--blue-50);   color: var(--blue-800);   border: 1px solid var(--blue-100); }
+  .badge-coral   { background: var(--coral-50);  color: var(--coral-800);  border: 1px solid var(--coral-100); }
+  .badge-amber   { background: var(--amber-50);  color: var(--amber-800);  border: 1px solid var(--amber-100); }
+  .badge-gray    { background: var(--gray-50);   color: var(--gray-800);   border: 1px solid var(--gray-100); }
+  .badge-rose    { background: var(--rose-50);   color: var(--rose-800);   border: 1px solid var(--rose-100); }
+
+  .dot-teal   { background: var(--teal-600); }
+  .dot-gray   { background: var(--gray-600); }
+  .dot-purple { background: var(--purple-600); }
+  .dot-blue   { background: var(--blue-600); }
+  .dot-coral  { background: var(--coral-600); }
+  .dot-amber  { background: var(--amber-600); }
+  .dot-rose   { background: var(--rose-600); }
+
+  /* Pipeline flow */
+  .pipeline-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  .pipeline-flow .card { flex: 1; min-width: 0; border-radius: 10px; }
+  .pipeline-flow .pipe-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 2px;
+    color: var(--arrow);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Branch connector */
+  .branch-connector {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    padding-right: 8px;
+  }
+  .branch-connector .arrow-down {
+    color: var(--arrow);
+    font-size: 18px;
+  }
+
+  /* Branch section */
+  .branch-section {
+    margin-left: auto;
+    max-width: 680px;
+  }
+  .branch-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding-left: 4px;
+  }
+  .branch-outputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Brownfield-only indicator */
+  .brownfield-only {
+    position: relative;
+  }
+  .brownfield-only::after {
+    content: 'brownfield only';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--rose-600);
+    background: var(--rose-50);
+    border: 1px solid var(--rose-100);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* Reconciliation flow */
+  .recon-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 12px;
+  }
+  .recon-flow .card { flex: 1; min-width: 0; }
+  .recon-flow .pipe-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    color: var(--arrow);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  /* Visibility toggles */
+  .greenfield-only { display: block; }
+  .brownfield-only-content { display: none; }
+
+  body.mode-brownfield .greenfield-only { display: none; }
+  body.mode-brownfield .brownfield-only-content { display: block; }
+
+  /* Feedback loop */
+  .feedback-loop {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    padding: 14px 20px;
+    background: var(--bg-subtle);
+    border-radius: 10px;
+    border: 1px dashed var(--dash);
+  }
+  .feedback-loop .loop-icon {
+    font-size: 20px;
+    color: var(--dash);
+    flex-shrink: 0;
+  }
+  .feedback-loop p {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Info box */
+  .info-box {
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+  .info-box strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* File tree */
+  .file-tree {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+    color: var(--text-secondary);
+    background: var(--bg-subtle);
+    padding: 24px 28px;
+    border-radius: 10px;
+    border: 1px solid var(--border-light);
+    overflow-x: auto;
+  }
+  .file-tree .dir { color: var(--text); font-weight: 500; }
+  .file-tree .comment { color: var(--text-tertiary); }
+  .file-tree .brownfield-file { color: var(--rose-600); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .pipeline-flow, .recon-flow { flex-direction: column; gap: 8px; }
+    .pipeline-flow .pipe-arrow, .recon-flow .pipe-arrow { transform: rotate(90deg); padding: 0; justify-content: center; }
+    .cards.maint, .cards.two-col, .branch-outputs { grid-template-columns: 1fr; }
+    .cards.three-col { grid-template-columns: 1fr; }
+    body { padding: 32px 16px 60px; }
+    .header h1 { font-size: 26px; }
+    .section-header .desc { display: none; }
+    .branch-section { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>AI-native development workflow</h1>
+    <p>A complete system for building software with AI agents as first-class collaborators. Every document feeds the next.</p>
+  </div>
+
+  <!-- Mode Toggle -->
+  <div class="mode-toggle">
+    <button class="active" onclick="setMode('greenfield')">Greenfield</button>
+    <button onclick="setMode('brownfield')">Brownfield</button>
+  </div>
+
+  <!-- Pipeline Formula: Greenfield -->
+  <div class="pipeline-formula greenfield-only">
+    <span class="step">Presearch</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">PRD</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">Tech presearch</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">Spec</span>
+    <span class="arrow-text">&rarr;</span>
+    <div class="branch">
+      <div class="branch-row"><span class="step">CLAUDE.md</span></div>
+      <div class="branch-row"><span class="step">TASKS.md</span></div>
+    </div>
+  </div>
+
+  <!-- Pipeline Formula: Brownfield -->
+  <div class="pipeline-formula brownfield-only-content">
+    <span class="step">Presearch</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">PRD</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">Tech presearch</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step">Spec</span>
+    <span class="arrow-text">+</span>
+    <span class="step" style="border-color: var(--rose-100); background: var(--rose-50); color: var(--rose-800);">Codebase</span>
+    <span class="arrow-text">&rarr;</span>
+    <span class="step" style="border-color: var(--rose-100);">Reconciliation</span>
+    <span class="arrow-text">&rarr;</span>
+    <div class="branch">
+      <div class="branch-row"><span class="step">CLAUDE.md</span></div>
+      <div class="branch-row"><span class="step">TASKS.md</span></div>
+    </div>
+  </div>
+
+  <!-- Foundation -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-gray"></div>
+      <h2>Foundation</h2>
+      <span class="desc">Set once, reference everywhere</span>
+    </div>
+    <div class="cards two-col">
+      <div class="card">
+        <span class="badge badge-gray">ORG-WIDE</span>
+        <h3>CONVENTIONS.md</h3>
+        <p class="question">How do we work?</p>
+        <p class="detail">Universal coding standards &mdash; commit format, branch naming, PR expectations, testing philosophy, naming rules, dependency policy. Every project's CLAUDE.md links here.</p>
+        <p class="filename">~/conventions/CONVENTIONS.md</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-gray">META</span>
+        <h3>AI_NATIVE_WORKFLOW.md</h3>
+        <p class="question">What's the process?</p>
+        <p class="detail">This document. Defines the pipeline, artifacts, skills, and how they connect. The system that produces all other documents.</p>
+        <p class="filename">docs/AI_NATIVE_WORKFLOW.md</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planning Pipeline -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-teal"></div>
+      <h2>Planning pipeline</h2>
+      <span class="desc">Idea &rarr; ready to code</span>
+    </div>
+    <div class="pipeline-flow">
+      <div class="card">
+        <span class="badge badge-teal">PHASE 1</span>
+        <h3>General presearch</h3>
+        <p class="question">What's out there?</p>
+        <p class="detail">Market landscape, competitors, user pain points, business context, risks. Divergent exploration before committing.</p>
+        <p class="filename">docs/GENERAL-PRESEARCH.md</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="card">
+        <span class="badge badge-teal">PHASE 2</span>
+        <h3>PRD</h3>
+        <p class="question">What are we building?</p>
+        <p class="detail">Product requirements &mdash; problem, users, stories, scope boundaries, success metrics. The alignment contract.</p>
+        <p class="filename">docs/PRD.md</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="card">
+        <span class="badge badge-teal">PHASE 3</span>
+        <h3>Technical presearch</h3>
+        <p class="question">Build with what?</p>
+        <p class="detail">Stack evaluation, architecture options, build-vs-buy, proof of concept needs. Evidence-based technical choices.</p>
+        <p class="filename">docs/TECHNICAL-PRESEARCH.md</p>
+      </div>
+      <div class="pipe-arrow">&rarr;</div>
+      <div class="card">
+        <span class="badge badge-teal">PHASE 4</span>
+        <h3>Spec</h3>
+        <p class="question">How do we build it?</p>
+        <p class="detail">Architecture, data model, API design, auth, infra, testing strategy, and task dependency DAG.</p>
+        <p class="filename">docs/SPEC.md</p>
+      </div>
+    </div>
+
+    <!-- Greenfield branching -->
+    <div class="greenfield-only">
+      <div class="branch-connector">
+        <span class="arrow-down">&darr;</span>
+      </div>
+      <div class="branch-section">
+        <div class="branch-label">Spec branches into two outputs</div>
+        <div class="branch-outputs">
+          <div class="card">
+            <span class="badge badge-purple">AI CONTEXT</span>
+            <h3>CLAUDE.md</h3>
+            <p class="question">What does the AI need to know?</p>
+            <p class="detail">Condensed onboarding for Claude Code &mdash; stack, commands, conventions, gotchas, guardrails. Read on every session.</p>
+            <p class="filename">CLAUDE.md</p>
+          </div>
+          <div class="card">
+            <span class="badge badge-purple">EXECUTION DAG</span>
+            <h3>TASKS.md</h3>
+            <p class="question">What's next? What's parallel?</p>
+            <p class="detail">Dependency DAG with layers, workstreams, and ready queue. Tasks in the same layer run concurrently via parallel agents.</p>
+            <p class="filename">docs/TASKS.md</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brownfield branching -->
+    <div class="brownfield-only-content">
+      <div class="branch-connector">
+        <span class="arrow-down">&darr;</span>
+      </div>
+      <div class="branch-section">
+        <div class="branch-label">Spec + codebase &rarr; reconciliation &rarr; outputs</div>
+        <div style="margin-bottom: 12px;">
+          <div class="card brownfield-only">
+            <span class="badge badge-rose">BRIDGE</span>
+            <h3>RECONCILIATION.md</h3>
+            <p class="question">What does the fork already give us?</p>
+            <p class="detail">Maps spec assumptions to codebase reality. Classifies every feature as EXISTS, PARTIAL, NEW, or CONFLICTS. Discovers conventions (adopt / evolve / replace). Identifies pre-satisfied dependencies and ADR triggers. This is the brownfield branching point &mdash; CLAUDE.md and TASKS.md derive from here, not directly from the spec.</p>
+            <p class="filename">docs/RECONCILIATION.md</p>
+          </div>
+        </div>
+        <div class="branch-connector">
+          <span class="arrow-down">&darr;</span>
+        </div>
+        <div class="branch-outputs">
+          <div class="card">
+            <span class="badge badge-purple">AI CONTEXT</span>
+            <h3>CLAUDE.md</h3>
+            <p class="question">What does the AI need to know?</p>
+            <p class="detail">Describes the <strong>actual</strong> repo &mdash; existing structure, inherited patterns, upstream quirks, plus spec changes. Not the idealized version.</p>
+            <p class="filename">CLAUDE.md</p>
+          </div>
+          <div class="card">
+            <span class="badge badge-purple">EXECUTION DAG</span>
+            <h3>TASKS.md</h3>
+            <p class="question">What's next? What's parallel?</p>
+            <p class="detail">Dependency DAG where EXISTS features are pre-satisfied, PARTIAL features get modification tasks, and CONFLICTS get removal + replacement pairs.</p>
+            <p class="filename">docs/TASKS.md</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>Why does the pipeline branch?</strong> CLAUDE.md (context) and TASKS.md (execution) are independent outputs &mdash; neither requires the other. Generate them in parallel. In brownfield, RECONCILIATION.md must come first because both outputs need ground-truth about the existing codebase.
+    </div>
+  </div>
+
+  <!-- During Development -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-blue"></div>
+      <h2>During development</h2>
+      <span class="desc">Daily work</span>
+    </div>
+    <div class="cards dev">
+      <div class="card">
+        <span class="badge badge-blue">LIVING TRACKER</span>
+        <h3>TASKS.md</h3>
+        <p class="question">What's ready to build?</p>
+        <p class="detail">The DAG is updated as tasks complete. Mark done, check what's unblocked, update the ready queue. The spec's DAG is the plan; this is reality.</p>
+        <p class="filename">docs/TASKS.md</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">SHIPPING</span>
+        <h3>CHANGELOG.md</h3>
+        <p class="question">What shipped?</p>
+        <p class="detail">Running log of changes written for humans. Added, changed, fixed, removed. Generated from git history.</p>
+        <p class="filename">CHANGELOG.md</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">PER PR</span>
+        <h3>PR descriptions</h3>
+        <p class="question">Why this change?</p>
+        <p class="detail">Links changes back to spec/PRD. Explains the why, flags risks, suggests review focus areas.</p>
+        <p class="filename">Generated per pull request</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">DECISIONS</span>
+        <h3>ADRs</h3>
+        <p class="question">Why this way?</p>
+        <p class="detail">Architecture Decision Records. Written when you deviate from the spec or choose between meaningful alternatives. In brownfield, triggered by CONFLICTS findings in the reconciliation.</p>
+        <p class="filename">adr/ADR-NNNN-title.md</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quality & Maintenance -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-coral"></div>
+      <h2>Quality and maintenance</h2>
+      <span class="desc">Things go wrong</span>
+    </div>
+    <div class="cards maint">
+      <div class="card">
+        <span class="badge badge-coral">KNOWLEDGE BASE</span>
+        <h3>TROUBLESHOOTING.md</h3>
+        <p class="question">What went wrong and how did we fix it?</p>
+        <p class="detail">Growing record of non-obvious problems. Every entry: symptom (what you saw) &rarr; cause (what was wrong) &rarr; fix (what you did).</p>
+        <p class="filename">TROUBLESHOOTING.md</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-coral">INCIDENTS</span>
+        <h3>Postmortems</h3>
+        <p class="question">What happened and how do we prevent it?</p>
+        <p class="detail">Blameless incident analysis. Timeline, root cause, action items with owners and deadlines. No blame, just learning.</p>
+        <p class="filename">postmortems/YYYY-MM-DD-title.md</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Closing the Loop -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-amber"></div>
+      <h2>Closing the loop</h2>
+      <span class="desc">Learn and iterate</span>
+    </div>
+    <div class="cards single">
+      <div class="card">
+        <span class="badge badge-amber">ITERATION</span>
+        <h3>Retrospective</h3>
+        <p class="question">What did we learn? What's next?</p>
+        <p class="detail">Evaluates outcomes against PRD success metrics. What worked, what didn't, what surprised you. Recommendations feed back into updated planning docs for the next cycle.</p>
+        <p class="filename">RETROSPECTIVE.md</p>
+      </div>
+    </div>
+    <div class="feedback-loop">
+      <div class="loop-icon">&#8634;</div>
+      <p>Retrospective findings feed back into the planning pipeline &mdash; updated presearch, revised PRD, new technical evaluation. The pipeline is a loop, not a line.</p>
+    </div>
+  </div>
+
+  <!-- File Tree -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-gray"></div>
+      <h2>Project structure</h2>
+      <span class="desc">Where everything lives</span>
+    </div>
+    <div class="file-tree">
+<span class="dir">CONVENTIONS.md</span> <span class="comment"># org-wide, linked from every project</span>
+<br>
+<span class="dir">my-project/</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">CLAUDE.md</span> <span class="comment"># AI agent onboarding</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">CHANGELOG.md</span> <span class="comment"># what shipped</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">TROUBLESHOOTING.md</span> <span class="comment"># solved problems</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">RETROSPECTIVE.md</span> <span class="comment"># iteration learnings</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">docs/</span>
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; GENERAL-PRESEARCH.md
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; PRD.md
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; TECHNICAL-PRESEARCH.md
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; SPEC.md
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="brownfield-file">RECONCILIATION.md</span> <span class="comment"># brownfield only</span>
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9492;&#9472;&#9472; TASKS.md <span class="comment"># dependency DAG</span>
+<br>&nbsp;&nbsp;&#9500;&#9472;&#9472; <span class="dir">adr/</span>
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9500;&#9472;&#9472; ADR-0001-use-postgres.md
+<br>&nbsp;&nbsp;&#9474;&nbsp;&nbsp;&nbsp;&#9492;&#9472;&#9472; ADR-0002-switch-to-redis.md
+<br>&nbsp;&nbsp;&#9492;&#9472;&#9472; <span class="dir">postmortems/</span>
+<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#9492;&#9472;&#9472; 2025-03-15-payment-outage.md
+    </div>
+  </div>
+
+  <!-- Skills Reference -->
+  <div class="section">
+    <div class="section-header">
+      <div class="dot dot-purple"></div>
+      <h2>Skills</h2>
+      <span class="desc">Every artifact has a generator</span>
+    </div>
+    <div class="cards three-col">
+      <div class="card">
+        <span class="badge badge-teal">PLANNING</span>
+        <h3>general-presearch</h3>
+        <p class="detail">Researches market, users, competitors. Divergent exploration of the problem space.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-teal">PLANNING</span>
+        <h3>prd-generator</h3>
+        <p class="detail">Turns research into product requirements. Scope, stories, success metrics.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-teal">PLANNING</span>
+        <h3>technical-presearch</h3>
+        <p class="detail">Evaluates implementation approaches. Stack comparison, build vs buy.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-teal">PLANNING</span>
+        <h3>spec-generator</h3>
+        <p class="detail">Translates requirements into engineering plan with task dependency DAG.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-rose">BROWNFIELD</span>
+        <h3>reconciliation</h3>
+        <p class="detail">Maps spec to existing codebase. Gap analysis, convention decisions, pre-satisfied deps.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-purple">OUTPUT</span>
+        <h3>claude-md-generator</h3>
+        <p class="detail">Creates AI onboarding doc from spec (or reconciliation) + repo.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-purple">OUTPUT</span>
+        <h3>tasks-generator</h3>
+        <p class="detail">Hydrates spec's DAG into living tracker with workstreams and ready queue.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-gray">FOUNDATION</span>
+        <h3>conventions-generator</h3>
+        <p class="detail">Codifies universal development standards across all projects.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">DEV</span>
+        <h3>changelog-generator</h3>
+        <p class="detail">Generates changelog from git history. Keep a Changelog format.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">DEV</span>
+        <h3>pr-description</h3>
+        <p class="detail">Context-rich PR descriptions. Links to spec, explains why, flags risks.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">DEV</span>
+        <h3>adr-generator</h3>
+        <p class="detail">Captures architectural decisions. Context, options, decision, consequences.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-coral">QUALITY</span>
+        <h3>troubleshooting</h3>
+        <p class="detail">Records non-obvious problem solutions. Symptom, cause, fix.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-coral">QUALITY</span>
+        <h3>postmortem</h3>
+        <p class="detail">Blameless incident analysis. Timeline, root cause, action items.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-amber">LOOP</span>
+        <h3>retrospective</h3>
+        <p class="detail">Evaluates outcomes, feeds learnings back into the planning pipeline.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setMode(mode) {
+    const body = document.body;
+    const buttons = document.querySelectorAll('.mode-toggle button');
+
+    if (mode === 'brownfield') {
+      body.classList.add('mode-brownfield');
+      buttons[0].classList.remove('active');
+      buttons[1].classList.add('active');
+    } else {
+      body.classList.remove('mode-brownfield');
+      buttons[0].classList.add('active');
+      buttons[1].classList.remove('active');
+    }
+  }
+
+  // Animate cards on scroll
+  document.querySelectorAll('.card').forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(12px)';
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const cards = entry.target.querySelectorAll('.card');
+        cards.forEach((card, i) => {
+          setTimeout(() => {
+            card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+          }, i * 80);
+        });
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+
+  // Animate the formula bars
+  document.querySelectorAll('.pipeline-formula').forEach(formula => {
+    formula.style.opacity = '0';
+    formula.style.transform = 'translateY(8px)';
+    setTimeout(() => {
+      formula.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      formula.style.opacity = '1';
+      formula.style.transform = 'translateY(0)';
+    }, 200);
+  });
+</script>
+</body>
+</html>
