@@ -449,8 +449,8 @@
 
   <!-- Mode Toggle -->
   <div class="mode-toggle">
-    <button class="active" onclick="setMode('greenfield')">Greenfield</button>
-    <button onclick="setMode('brownfield')">Brownfield</button>
+    <button type="button" class="active" onclick="setMode('greenfield')">Greenfield</button>
+    <button type="button" onclick="setMode('brownfield')">Brownfield</button>
   </div>
 
   <!-- Pipeline Formula: Greenfield -->
@@ -824,7 +824,7 @@
 </div>
 
 <script>
-  function setMode(mode) {
+  function _setMode(mode) {
     const body = document.body;
     const buttons = document.querySelectorAll('.mode-toggle button');
 
@@ -861,7 +861,7 @@
     });
   }, { threshold: 0.1 });
 
-  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+  document.querySelectorAll('.section').forEach((s) => { observer.observe(s); });
 
   // Animate the formula bars
   document.querySelectorAll('.pipeline-formula').forEach(formula => {
