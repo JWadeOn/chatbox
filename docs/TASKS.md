@@ -122,7 +122,12 @@ T20 → T21
 
 ## Ready to Start
 
-- [ ] T00: Codebase separation (S) [WS-A] ← none
+PARALLEL OPPORTUNITY: 4 tasks ready, all independent. Can assign to separate agents.
+
+- [ ] T02: User authentication (M) [WS-A] ← T01 (done)
+- [ ] T05: Tool schema sanitizer (S) [WS-B] ← T01 (done)
+- [ ] T08: Invocation state machine (M) [WS-B] ← T01 (done)
+- [ ] T10: Intent service (M) [WS-B] ← T01 (done)
 
 ---
 
@@ -130,13 +135,13 @@ T20 → T21
 
 > Brownfield-specific prerequisite. Ensures chatbox/ is isolated before new code is written.
 
-- [ ] T00: Codebase separation — isolate chatbox/ directory, verify no cross-boundary imports, configure .gitignore, ensure chatbox/ is read-only reference only (S) [WS-A] ← none
+- [~] T00: Codebase separation — isolate chatbox/ directory, verify no cross-boundary imports, configure .gitignore, ensure chatbox/ is read-only reference only (S) [WS-A] ← none
 
 ## Layer 1 — Scaffold (deadline: MVP Tue)
 
 > Project foundation. Everything else depends on this.
 
-- [ ] T01: Project scaffold + DB schema — init Next.js with TypeScript, set up PostgreSQL connection, run migrations for all 8 tables (users, conversations, messages, apps, tool_logs, oauth_tokens, intents, app_sessions), configure Vitest, ESLint, Prettier, set up pino structured logger (L) [WS-A] ← T00
+- [x] T01: Project scaffold + DB schema — init Next.js with TypeScript, set up PostgreSQL connection, run migrations for all 8 tables (users, conversations, messages, apps, tool_logs, oauth_tokens, intents, app_sessions), configure Vitest, Biome, set up pino structured logger (L) [WS-A] ← T00 — done 2026-04-02
 
 ## Layer 2 — Core Services (deadline: MVP Tue)
 
@@ -235,6 +240,9 @@ T20 → T21
 ## Completed
 
 <!-- Move items here when done. Include date. Check if completing this unblocked anything. -->
+
+- [x] T00: Codebase separation (S) [WS-A] — done 2026-04-02. Unblocked: T01.
+- [x] T01: Project scaffold + DB schema (L) [WS-A] — done 2026-04-02. Unblocked: T02, T05, T08, T10.
 
 ---
 
