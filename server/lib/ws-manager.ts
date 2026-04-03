@@ -10,7 +10,8 @@ export class WSManager {
   private wss: WebSocketServer;
   private clients = new Map<string, Set<AuthenticatedSocket>>();
 
-  constructor(server: { on: (event: string, cb: (...args: unknown[]) => void) => void }) {
+  // biome-ignore lint: server type is intentionally loose for http.Server compatibility
+  constructor(server: { on: (event: string, cb: (...args: any[]) => void) => void }) {
     this.wss = new WebSocketServer({ noServer: true });
 
     server.on('upgrade', (request: IncomingMessage, socket: unknown, head: Buffer) => {

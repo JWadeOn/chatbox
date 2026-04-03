@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.git/
+chatbox/
+coverage/
+docs/
+__tests__/
+*.md
+.env*
+.DS_Store
+.vscode/
+.idea/
