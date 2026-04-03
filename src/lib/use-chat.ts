@@ -96,6 +96,27 @@ export function useChat({ conversationId, token }: UseChatOptions): UseChatRetur
     [conversationId, token, streaming, transcript, app]
   );
 
+  // Wrap handleAppComplete to also notify the server, persisting the completion to the DB.
+  const handleAppComplete = useCallback(
+    (summary: string, data: Record<string, unknown>) => {
+      const sessionId = app.appEmbed?.sessionId;
+      app.handleAppComplete(summary, data);
+
+      // Fire-and-forget POST to server to persist completion
+      if (sessionId) {
+        fetch('/api/app-complete', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, summary, data }),
+        }).catch(() => {
+          // Non-critical: completion state is best-effort
+          console.error('[use-chat] Failed to persist app completion to server');
+        });
+      }
+    },
+    [app, token]
+  );
+
   return {
     messages: transcript.messages,
     streaming,
@@ -103,7 +124,7 @@ export function useChat({ conversationId, token }: UseChatOptions): UseChatRetur
     error,
     sendMessage,
     closeApp: app.closeApp,
-    handleAppComplete: app.handleAppComplete,
+    handleAppComplete,
     handleAppError: app.handleAppError,
   };
 }

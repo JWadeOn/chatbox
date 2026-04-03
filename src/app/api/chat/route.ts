@@ -7,6 +7,7 @@ import { authErrorResponse, extractAuth } from '../../../../server/middleware/au
 import { completionService } from '../../../../server/services/completion.service';
 import { conversationService } from '../../../../server/services/conversation.service';
 import { toolService } from '../../../../server/services/tool.service';
+import { toolRouter } from '../../../../server/services/tool-router.service';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
@@ -15,46 +16,48 @@ const chessHandler = new ChessToolHandler();
 const weatherHandler = new WeatherToolHandler();
 const spotifyHandler = new SpotifyToolHandler();
 
-async function handleToolCall(
-  namespacedName: string,
+// App iframe URLs for app_render events
+const APP_IFRAME_URLS: Record<string, string> = {
+  chess: '/apps/chess',
+  spotify: '/apps/spotify',
+};
+
+// Which tool calls should trigger an app_render
+const APP_RENDER_TRIGGERS: Record<string, string[]> = {
+  chess: ['start_game'],
+  spotify: ['create_playlist'],
+};
+
+/** Execute the actual tool handler (app-specific logic). */
+async function executeToolHandler(
+  appSlug: string,
+  toolName: string,
   args: Record<string, unknown>,
   sessionId: string,
   userId: string,
   conversationId: string
-): Promise<{ result: unknown; appSlug: string; toolName: string }> {
-  const [appSlug, toolName] = namespacedName.split('__');
-
-  let result: unknown;
+): Promise<unknown> {
   switch (appSlug) {
     case 'chess':
-      result = await chessHandler.handleToolInvoke(sessionId, toolName, args);
-      break;
+      return chessHandler.handleToolInvoke(sessionId, toolName, args);
     case 'weather':
-      result = await weatherHandler.handleToolInvoke(toolName, args);
-      break;
+      return weatherHandler.handleToolInvoke(toolName, args);
     case 'spotify':
-      result = await spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
-      break;
+      return spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
     default:
-      result = { error: `No handler for app: ${appSlug}` };
+      return { error: `No handler for app: ${appSlug}` };
   }
-
-  return { result, appSlug, toolName };
 }
 
 /**
  * Get active app state for mid-app assistance.
- * When a user asks a question during an active app session,
- * this injects the current app state into LLM context.
- * Checks all known session keys since the session ID varies per request.
+ * Scans chess handler for active games keyed by the conversation.
  */
 function getActiveAppContext(conversationId: string): string {
-  // Chess: scan for any active game whose session key starts with the conversation
-  // The chess handler stores games keyed by sessionId = "session-{conversationId}-{timestamp}"
   const games = chessHandler as unknown as { games: Map<string, unknown> };
   if (games.games) {
     for (const [key] of games.games) {
-      if (key.startsWith(`session-${conversationId}-`)) {
+      if (key.includes(conversationId)) {
         const state = chessHandler.getActiveGameState(key);
         if (state) {
           return `\n\n## Active App Context\nThere is an active chess game. Current state:\n- FEN: ${state.fen}\n- Turn: ${state.turn}\n- Move history: ${state.history?.join(', ') || 'none'}\n- Material: ${state.material}\nUse this context to help the user if they ask about the game.`;
@@ -124,7 +127,6 @@ You have access to tools from registered apps. Use them when the user's request 
     ];
 
     const encoder = new TextEncoder();
-    const sessionId = `session-${conversationId}-${Date.now()}`;
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -146,17 +148,47 @@ You have access to tools from registered apps. Use them when the user's request 
             // Add assistant message with tool calls to context
             messages.push(response.choices[0].message);
 
-            // Process each tool call
+            // Process each tool call through the tool router
             for (const tc of toolCalls) {
               if (tc.type !== 'function') continue;
+
+              const [appSlug, toolName] = tc.function.name.split('__');
               const args = JSON.parse(tc.function.arguments || '{}');
-              const { result, appSlug, toolName } = await handleToolCall(
-                tc.function.name,
-                args,
-                sessionId,
+
+              // 1. Route through toolRouter for session management, logging, circuit breaker
+              const routeResult = await toolRouter.invoke({
+                conversationId,
+                appSlug,
+                toolName,
+                toolParams: args,
                 userId,
-                conversationId
-              );
+              });
+
+              if (!routeResult.success) {
+                // Circuit breaker open or tool not found
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result: { error: routeResult.error } })}\n\n`
+                  )
+                );
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify({ error: routeResult.error }),
+                });
+                continue;
+              }
+
+              const invocationId = routeResult.invocationId;
+              const sessionId = routeResult.sessionId ?? '';
+
+              // 2. Execute the actual tool handler
+              const result = await executeToolHandler(appSlug, toolName, args, sessionId, userId, conversationId);
+
+              // 3. Record the result in the tool router (logging, circuit breaker)
+              if (invocationId) {
+                await toolRouter.handleResult(invocationId, result);
+              }
 
               // Send tool invocation event to client
               controller.enqueue(
@@ -164,24 +196,14 @@ You have access to tools from registered apps. Use them when the user's request 
               );
 
               // Send app_render for apps that have a UI component
-              if (appSlug === 'chess' && toolName === 'start_game') {
+              const triggers = APP_RENDER_TRIGGERS[appSlug];
+              if (triggers?.includes(toolName) && APP_IFRAME_URLS[appSlug]) {
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
                       type: 'app_render',
-                      appSlug: 'chess',
-                      iframeUrl: '/apps/chess',
-                      sessionId,
-                    })}\n\n`
-                  )
-                );
-              } else if (appSlug === 'spotify' && toolName === 'create_playlist') {
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: 'app_render',
-                      appSlug: 'spotify',
-                      iframeUrl: '/apps/spotify',
+                      appSlug,
+                      iframeUrl: APP_IFRAME_URLS[appSlug],
                       sessionId,
                     })}\n\n`
                   )
@@ -189,11 +211,7 @@ You have access to tools from registered apps. Use them when the user's request 
               }
 
               // Add tool result to context
-              messages.push({
-                role: 'tool',
-                tool_call_id: tc.id,
-                content: JSON.stringify(result),
-              });
+              messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
             }
 
             // Get next LLM response with tool results
