@@ -26,8 +26,13 @@ export function useChat({ conversationId, token }: UseChatOptions) {
   const [appEmbed, setAppEmbed] = useState<AppEmbed | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load existing messages
+  // Reset state and load messages when conversation changes
   useEffect(() => {
+    setMessages([]);
+    setAppEmbed(null);
+    setError(null);
+    setStreaming(false);
+
     fetch(`/api/conversations/${conversationId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })

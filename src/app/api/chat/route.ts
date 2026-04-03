@@ -110,6 +110,7 @@ You have access to tools from registered apps. Use them when the user's request 
 
             // Process each tool call
             for (const tc of toolCalls) {
+              if (tc.type !== 'function') continue;
               const args = JSON.parse(tc.function.arguments || '{}');
               const { result, appSlug, toolName } = await handleToolCall(tc.function.name, args, sessionId);
 

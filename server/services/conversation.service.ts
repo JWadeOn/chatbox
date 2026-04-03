@@ -60,7 +60,21 @@ export class ConversationService {
       .values({ conversationId, role, content, metadata: metadata || {} })
       .returning();
 
-    await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
+    // Auto-title: set title from first user message if untitled
+    if (role === 'user') {
+      const [conv] = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+      if (conv && !conv.title) {
+        const title = content.length > 50 ? `${content.slice(0, 47)}...` : content;
+        await db
+          .update(conversations)
+          .set({ title, updatedAt: new Date() })
+          .where(eq(conversations.id, conversationId));
+      } else {
+        await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
+      }
+    } else {
+      await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
+    }
 
     return message;
   }
