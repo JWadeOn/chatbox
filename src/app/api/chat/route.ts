@@ -31,12 +31,25 @@ export async function POST(request: NextRequest) {
       })),
     ];
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OPENAI_API_KEY not configured. Add it to .env.local and restart.' },
+        { status: 503 }
+      );
+    }
+
     // Stream response
-    const stream = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages,
-      stream: true,
-    });
+    let stream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
+    try {
+      stream = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages,
+        stream: true,
+      });
+    } catch (llmError) {
+      const msg = llmError instanceof Error ? llmError.message : 'LLM request failed';
+      return NextResponse.json({ error: `OpenAI error: ${msg}` }, { status: 502 });
+    }
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
@@ -70,6 +83,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error('[chat] Error:', error);
     return authErrorResponse(error);
   }
 }
