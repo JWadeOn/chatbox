@@ -122,12 +122,10 @@ T20 → T21
 
 ## Ready to Start
 
-PARALLEL OPPORTUNITY: 4 tasks ready, all independent. Can assign to separate agents.
+PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T02: User authentication (M) [WS-A] ← T01 (done)
-- [ ] T05: Tool schema sanitizer (S) [WS-B] ← T01 (done)
-- [ ] T08: Invocation state machine (M) [WS-B] ← T01 (done)
-- [ ] T10: Intent service (M) [WS-B] ← T01 (done)
+- [ ] T03: Conversation CRUD (M) [WS-A] ← T02 (done)
+- [ ] T06: App registration (M) [WS-B] ← T05 (done)
 
 ---
 
@@ -147,10 +145,10 @@ PARALLEL OPPORTUNITY: 4 tasks ready, all independent. Can assign to separate age
 
 > Four independent modules that only need the scaffold. Maximum parallelism: 4 agents.
 
-- [ ] T02: User authentication — register/login/logout/me endpoints, JWT, bcrypt, role-based access (student/teacher/admin), auth middleware (M) [WS-A] ← T01
-- [ ] T05: Tool schema sanitizer — strip prompt injection from tool descriptions, name validation (alphanumeric + underscore), description truncation (200 char), HTML/markdown stripping (S) [WS-B] ← T01
-- [ ] T08: Invocation state machine — IDLE/TOOL_REQUESTED/APP_RENDERED/ACTIVE/COMPLETED/ERROR/TIMEOUT transitions, invalid transition rejection, idempotent duplicate handling (M) [WS-B] ← T01
-- [ ] T10: Intent service — intent creation on tool invocation, one-active-per-conversation rule, intent resolution/abandonment on app_complete/timeout (M) [WS-B] ← T01
+- [x] T02: User authentication — register/login/logout/me endpoints, JWT, bcrypt, role-based access (student/teacher/admin), auth middleware (M) [WS-A] ← T01 — done 2026-04-02
+- [x] T05: Tool schema sanitizer — strip prompt injection from tool descriptions, name validation (alphanumeric + underscore), description truncation (200 char), HTML/markdown stripping (S) [WS-B] ← T01 — done 2026-04-02
+- [x] T08: Invocation state machine — IDLE/TOOL_REQUESTED/APP_RENDERED/ACTIVE/COMPLETED/ERROR/TIMEOUT transitions, invalid transition rejection, idempotent duplicate handling (M) [WS-B] ← T01 — done 2026-04-02
+- [x] T10: Intent service — intent creation on tool invocation, one-active-per-conversation rule, intent resolution/abandonment on app_complete/timeout (M) [WS-B] ← T01 — done 2026-04-02
 
 ## Layer 3 — Auth-Dependent Services (deadline: MVP Tue)
 
@@ -243,6 +241,10 @@ PARALLEL OPPORTUNITY: 4 tasks ready, all independent. Can assign to separate age
 
 - [x] T00: Codebase separation (S) [WS-A] — done 2026-04-02. Unblocked: T01.
 - [x] T01: Project scaffold + DB schema (L) [WS-A] — done 2026-04-02. Unblocked: T02, T05, T08, T10.
+- [x] T02: User authentication (M) [WS-A] — done 2026-04-02. Unblocked: T03.
+- [x] T05: Tool schema sanitizer (S) [WS-B] — done 2026-04-02. Unblocked: T06.
+- [x] T08: Invocation state machine (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T07+T10).
+- [x] T10: Intent service (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T07+T08).
 
 ---
 
