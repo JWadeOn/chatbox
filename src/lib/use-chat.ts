@@ -1,155 +1,109 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+/**
+ * Composite chat hook — composes transport, transcript, and app orchestrator.
+ *
+ * Each concern is a separate module:
+ *   - chat-transport.ts     → SSE streaming and fetch logic
+ *   - transcript-store.ts   → message state (ChatMessageViewModel)
+ *   - app-orchestrator.ts   → app lifecycle coordination
+ */
 
-type Message = {
-  id: string;
-  role: 'user' | 'assistant' | 'system' | 'tool_result';
-  content: string;
-};
-
-type AppEmbed = {
-  appId: string;
-  appSlug: string;
-  iframeUrl: string;
-  sessionId: string;
-};
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AppEmbedState, ChatMessageViewModel, StreamEvent } from '@/types/chat';
+import { useAppOrchestrator } from './app-orchestrator';
+import { fetchConversation, streamChatMessage } from './chat-transport';
+import { useTranscriptStore } from './transcript-store';
 
 type UseChatOptions = {
   conversationId: string;
   token: string;
 };
 
-export function useChat({ conversationId, token }: UseChatOptions) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [streaming, setStreaming] = useState(false);
-  const [appEmbed, setAppEmbed] = useState<AppEmbed | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export type UseChatReturn = {
+  messages: ChatMessageViewModel[];
+  streaming: boolean;
+  appEmbed: AppEmbedState | null;
+  error: string | null;
+  sendMessage: (content: string) => void;
+  closeApp: () => void;
+  handleAppComplete: (summary: string, data: Record<string, unknown>) => void;
+  handleAppError: (message: string, recoverable: boolean) => void;
+};
 
-  // Reset state and load messages when conversation changes
+export function useChat({ conversationId, token }: UseChatOptions): UseChatReturn {
+  const transcript = useTranscriptStore();
+  const app = useAppOrchestrator();
+  const [streaming, setStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  // Reset and load conversation when ID changes.
+  // Adapter functions are stable refs — only conversationId/token should trigger re-runs.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stable adapter refs excluded intentionally
   useEffect(() => {
-    setMessages([]);
-    setAppEmbed(null);
+    transcript.clear();
+    app.reset();
     setError(null);
     setStreaming(false);
+    abortRef.current?.();
 
-    fetch(`/api/conversations/${conversationId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    fetchConversation(conversationId, token)
       .then((data) => {
         if (data.messages) {
-          setMessages(
-            data.messages.map((m: { id: string; role: string; content: string }) => ({
-              id: m.id,
-              role: m.role as Message['role'],
-              content: m.content,
-            }))
-          );
+          transcript.loadMessages(data.messages);
         }
       })
       .catch(() => setError('Failed to load conversation'));
   }, [conversationId, token]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    (content: string) => {
       if (streaming) return;
 
-      // Add user message immediately
-      const userMsgId = `user-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: userMsgId, role: 'user', content }]);
+      transcript.addUserMessage(content);
       setError(null);
       setStreaming(true);
 
-      // Add empty assistant message for streaming
-      const assistantMsgId = `assistant-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
-
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ conversationId, content }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Chat request failed');
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error('No response stream');
-
-        const decoder = new TextDecoder();
-        let assistantContent = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split('\n');
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const json = line.slice(6);
-            try {
-              const data = JSON.parse(json);
-              if (data.type === 'tool_call') {
-                // Insert a system message showing the tool invocation
-                const toolMsg: Message = {
-                  id: `tool-${Date.now()}-${Math.random()}`,
-                  role: 'system',
-                  content: `[${data.appSlug}] ${data.toolName}(${JSON.stringify(data.args)}) → ${JSON.stringify(data.result)}`,
-                };
-                setMessages((prev) => {
-                  // Insert before the assistant placeholder
-                  const idx = prev.findIndex((m) => m.id === assistantMsgId);
-                  if (idx >= 0) {
-                    const copy = [...prev];
-                    copy.splice(idx, 0, toolMsg);
-                    return copy;
-                  }
-                  return [...prev, toolMsg];
-                });
-              } else if (data.type === 'app_render') {
-                setAppEmbed({
-                  appId: data.appSlug,
-                  appSlug: data.appSlug,
-                  iframeUrl: data.iframeUrl,
-                  sessionId: data.sessionId,
-                });
-              } else if (data.content) {
-                assistantContent += data.content;
-                setMessages((prev) =>
-                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantContent } : m))
-                );
-              }
-              if (data.error) {
-                setError(data.error);
-              }
-            } catch {
-              // Skip malformed chunks
+      const abort = streamChatMessage(conversationId, content, token, {
+        onEvent: (event: StreamEvent) => {
+          if ('type' in event) {
+            if (event.type === 'tool_call') {
+              transcript.insertToolCall(event);
+            } else if (event.type === 'app_render') {
+              app.handleAppRender(event);
             }
           }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to send message');
-        // Remove empty assistant message on error
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId || m.content));
-      } finally {
-        setStreaming(false);
-      }
+          if ('content' in event && typeof event.content === 'string') {
+            transcript.appendStreamContent(event.content);
+          }
+          if ('error' in event && typeof event.error === 'string') {
+            setError(event.error);
+          }
+        },
+        onError: (errMsg: string) => {
+          setError(errMsg);
+          transcript.removeEmptyAssistant();
+        },
+        onDone: () => {
+          transcript.finalizeStream();
+          setStreaming(false);
+        },
+      });
+
+      abortRef.current = abort;
     },
-    [conversationId, token, streaming]
+    [conversationId, token, streaming, transcript, app]
   );
 
-  const closeApp = useCallback(() => {
-    setAppEmbed(null);
-  }, []);
-
-  return { messages, streaming, appEmbed, error, sendMessage, closeApp };
+  return {
+    messages: transcript.messages,
+    streaming,
+    appEmbed: app.appEmbed,
+    error,
+    sendMessage,
+    closeApp: app.closeApp,
+    handleAppComplete: app.handleAppComplete,
+    handleAppError: app.handleAppError,
+  };
 }

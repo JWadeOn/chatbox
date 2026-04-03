@@ -1,12 +1,19 @@
 'use client';
 
+/**
+ * ChatWindow — main chat view composing Chatbox-derived components.
+ *
+ * Uses the refactored useChat hook (adapter-based) and renders messages
+ * via the Chatbox-derived Message component with contentParts model.
+ */
+
 import { useEffect, useRef } from 'react';
+import { InputBox } from '@/components/chatbox/InputBox';
+import { CodeCollapseProvider } from '@/components/chatbox/Markdown';
+import { Message } from '@/components/chatbox/Message';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
-import { StreamingDots } from '@/components/ui/StreamingDots';
 import { useChat } from '@/lib/use-chat';
 import { AppRenderer } from './AppRenderer';
-import { MessageBubble } from './MessageBubble';
-import { MessageInput } from './MessageInput';
 
 const SUGGESTIONS = [
   { label: "Let's play chess", icon: '\u265E' },
@@ -20,13 +27,16 @@ type ChatWindowProps = {
 };
 
 export function ChatWindow({ conversationId, token }: ChatWindowProps) {
-  const { messages, streaming, appEmbed, error, sendMessage, closeApp } = useChat({ conversationId, token });
+  const { messages, streaming, appEmbed, error, sendMessage, closeApp, handleAppComplete, handleAppError } = useChat({
+    conversationId,
+    token,
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const messageCount = messages.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on message count change
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messageCount]);
+  }, [messages.length]);
 
   return (
     <div className="flex h-full flex-col">
@@ -53,15 +63,11 @@ export function ChatWindow({ conversationId, token }: ChatWindowProps) {
             </div>
           )}
 
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
-          ))}
-
-          {streaming && messages[messages.length - 1]?.content === '' && (
-            <div className="flex justify-start">
-              <StreamingDots />
-            </div>
-          )}
+          <CodeCollapseProvider defaultCollapsed>
+            {messages.map((msg) => (
+              <Message key={msg.id} message={msg} />
+            ))}
+          </CodeCollapseProvider>
 
           {appEmbed && (
             <AppRenderer
@@ -69,8 +75,8 @@ export function ChatWindow({ conversationId, token }: ChatWindowProps) {
               iframeUrl={appEmbed.iframeUrl}
               sessionId={appEmbed.sessionId}
               onToolResult={() => {}}
-              onAppComplete={() => closeApp()}
-              onAppError={() => closeApp()}
+              onAppComplete={(summary, data) => handleAppComplete(summary, data)}
+              onAppError={(message, recoverable) => handleAppError(message, recoverable)}
               onClose={closeApp}
             />
           )}
@@ -79,8 +85,8 @@ export function ChatWindow({ conversationId, token }: ChatWindowProps) {
         </div>
       </div>
 
-      {/* Input area */}
-      <MessageInput onSend={sendMessage} disabled={streaming} />
+      {/* Input area — Chatbox-derived InputBox */}
+      <InputBox onSend={sendMessage} disabled={streaming} streaming={streaming} sessionId={conversationId} />
     </div>
   );
 }

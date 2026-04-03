@@ -115,13 +115,9 @@ export function AppRenderer({
       <iframe
         ref={iframeRef}
         src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}?sessionId=${sessionId}`}
-        /* Internal apps (same-origin) need allow-same-origin to load.
-           Third-party apps served from external domains should NOT get allow-same-origin. */
-        sandbox={
-          iframeUrl.startsWith('/')
-            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
-            : 'allow-scripts allow-forms allow-popups'
-        }
+        /* All apps use the same restricted sandbox — allow-same-origin is
+           deliberately omitted per the security model in CLAUDE.md. */
+        sandbox="allow-scripts allow-forms allow-popups"
         referrerPolicy="no-referrer"
         loading="lazy"
         title={`${appSlug} app`}

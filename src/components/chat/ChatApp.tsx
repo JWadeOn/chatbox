@@ -1,7 +1,11 @@
 'use client';
 
+/**
+ * ChatApp — top-level chat shell composing Chatbox-derived sidebar and chat window.
+ */
+
 import { useCallback, useState } from 'react';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { SessionList } from '@/components/chatbox/SessionList';
 import { useAuth } from '@/lib/auth-context';
 import { ChatWindow } from './ChatWindow';
 
@@ -28,7 +32,7 @@ export function ChatApp() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar activeId={activeConversationId} onSelect={setActiveConversationId} onNew={handleNew} />
+      <SessionList activeId={activeConversationId} onSelect={setActiveConversationId} onNew={handleNew} />
       <main className="flex-1">
         {activeConversationId && token ? (
           <ChatWindow conversationId={activeConversationId} token={token} />
