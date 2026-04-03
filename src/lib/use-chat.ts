@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type Message = {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool_result';
   content: string;
-  streaming?: boolean;
 };
 
 type AppEmbed = {
@@ -26,9 +25,6 @@ export function useChat({ conversationId, token }: UseChatOptions) {
   const [streaming, setStreaming] = useState(false);
   const [appEmbed, setAppEmbed] = useState<AppEmbed | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const streamContentRef = useRef('');
-  const streamIdRef = useRef('');
 
   // Load existing messages
   useEffect(() => {
@@ -50,89 +46,76 @@ export function useChat({ conversationId, token }: UseChatOptions) {
       .catch(() => setError('Failed to load conversation'));
   }, [conversationId, token]);
 
-  // WebSocket connection
-  useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/chat?token=${token}`);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      switch (data.type) {
-        case 'stream_start':
-          streamIdRef.current = data.messageId;
-          streamContentRef.current = '';
-          setStreaming(true);
-          setMessages((prev) => [...prev, { id: data.messageId, role: 'assistant', content: '', streaming: true }]);
-          break;
-
-        case 'stream_chunk':
-          streamContentRef.current += data.content;
-          setMessages((prev) =>
-            prev.map((m) => (m.id === streamIdRef.current ? { ...m, content: streamContentRef.current } : m))
-          );
-          break;
-
-        case 'stream_end':
-          setStreaming(false);
-          setMessages((prev) => prev.map((m) => (m.id === streamIdRef.current ? { ...m, streaming: false } : m)));
-          break;
-
-        case 'tool_invoke':
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `tool-${Date.now()}`,
-              role: 'system',
-              content: `Invoking ${data.tool} on ${data.appId}...`,
-            },
-          ]);
-          break;
-
-        case 'app_render':
-          setAppEmbed({
-            appId: data.appId,
-            appSlug: data.appSlug || 'app',
-            iframeUrl: data.iframeUrl,
-            sessionId: data.sessionId,
-          });
-          break;
-
-        case 'error':
-          setError(data.message);
-          setStreaming(false);
-          break;
-      }
-    };
-
-    ws.onclose = () => {
-      // Auto-reconnect after 3 seconds
-      setTimeout(() => {
-        if (wsRef.current?.readyState === WebSocket.CLOSED) {
-          setError('Connection lost. Refresh to reconnect.');
-        }
-      }, 3000);
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [token]);
-
   const sendMessage = useCallback(
-    (content: string) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        setError('Not connected');
-        return;
-      }
+    async (content: string) => {
+      if (streaming) return;
 
-      setMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', content }]);
+      // Add user message immediately
+      const userMsgId = `user-${Date.now()}`;
+      setMessages((prev) => [...prev, { id: userMsgId, role: 'user', content }]);
       setError(null);
+      setStreaming(true);
 
-      wsRef.current.send(JSON.stringify({ type: 'user_message', conversationId, content }));
+      // Add empty assistant message for streaming
+      const assistantMsgId = `assistant-${Date.now()}`;
+      setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ conversationId, content }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Chat request failed');
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('No response stream');
+
+        const decoder = new TextDecoder();
+        let assistantContent = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split('\n');
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const json = line.slice(6);
+            try {
+              const data = JSON.parse(json);
+              if (data.content) {
+                assistantContent += data.content;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantContent } : m))
+                );
+              }
+              if (data.error) {
+                setError(data.error);
+              }
+            } catch {
+              // Skip malformed chunks
+            }
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+        // Remove empty assistant message on error
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId || m.content));
+      } finally {
+        setStreaming(false);
+      }
     },
-    [conversationId]
+    [conversationId, token, streaming]
   );
 
   const closeApp = useCallback(() => {
