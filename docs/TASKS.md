@@ -124,9 +124,7 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T18: UI polish (M) [WS-E] ← T15 (done)
-- [ ] T19: Documentation (M) [WS-E] ← T15 (done)
-- [ ] T20: Deployment (M) [WS-E] ← T15 (done)
+- [ ] T21: Deliverables — demo video, AI cost analysis, social post (M) [WS-E] ← T20 (done)
 
 ---
 
@@ -207,9 +205,9 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > All features complete. Focus on quality, docs, and deployment.
 
-- [ ] T18: UI polish — loading spinners during LLM streaming, progress indicators during tool invocation, smooth iframe mount/unmount transitions, responsive layout (M) [WS-E] ← T15
-- [ ] T19: Documentation — API docs for third-party developers, setup guide (README), architecture overview (M) [WS-E] ← T15
-- [ ] T20: Deployment — deploy frontend (Vercel), deploy backend (Railway/Render), configure production PostgreSQL, verify all 3 apps work in production (M) [WS-E] ← T15
+- [x] T18: UI polish — loading spinners during LLM streaming, progress indicators during tool invocation, smooth iframe mount/unmount transitions, responsive layout (M) [WS-E] ← T15 — done 2026-04-02
+- [x] T19: Documentation — API docs for third-party developers, setup guide (README), architecture overview (M) [WS-E] ← T15 — done 2026-04-02
+- [x] T20: Deployment — deploy frontend (Vercel), deploy backend (Railway/Render), configure production PostgreSQL, verify all 3 apps work in production (M) [WS-E] ← T15 — done 2026-04-02
 
 ## Layer 12 — Final Deliverables (deadline: Final Sun)
 
@@ -258,6 +256,9 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 - [x] T14: Weather app (M) [WS-D] — done 2026-04-02. Unblocked: T15, T17.
 - [x] T15: Spotify/OAuth (L) [WS-D] — done 2026-04-02. Unblocked: T18, T19, T20.
 - [x] T17: Multi-app switching (M) [WS-E] — done 2026-04-02.
+- [x] T18: UI polish (M) [WS-E] — done 2026-04-02.
+- [x] T19: Documentation (M) [WS-E] — done 2026-04-02.
+- [x] T20: Deployment (M) [WS-E] — done 2026-04-02. Unblocked: T21.
 
 ---
 
