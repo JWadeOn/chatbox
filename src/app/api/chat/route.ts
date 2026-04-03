@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { ChessToolHandler } from '../../../../server/apps/chess';
+import { SpotifyToolHandler } from '../../../../server/apps/spotify';
 import { WeatherToolHandler } from '../../../../server/apps/weather';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
+import { completionService } from '../../../../server/services/completion.service';
 import { conversationService } from '../../../../server/services/conversation.service';
 import { toolService } from '../../../../server/services/tool.service';
 
@@ -11,11 +13,14 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 // App tool handlers (keyed by app slug)
 const chessHandler = new ChessToolHandler();
 const weatherHandler = new WeatherToolHandler();
+const spotifyHandler = new SpotifyToolHandler();
 
 async function handleToolCall(
   namespacedName: string,
   args: Record<string, unknown>,
-  sessionId: string
+  sessionId: string,
+  userId: string,
+  conversationId: string
 ): Promise<{ result: unknown; appSlug: string; toolName: string }> {
   const [appSlug, toolName] = namespacedName.split('__');
 
@@ -27,11 +32,37 @@ async function handleToolCall(
     case 'weather':
       result = await weatherHandler.handleToolInvoke(toolName, args);
       break;
+    case 'spotify':
+      result = await spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
+      break;
     default:
       result = { error: `No handler for app: ${appSlug}` };
   }
 
   return { result, appSlug, toolName };
+}
+
+/**
+ * Get active app state for mid-app assistance.
+ * When a user asks a question during an active app session,
+ * this injects the current app state into LLM context.
+ * Checks all known session keys since the session ID varies per request.
+ */
+function getActiveAppContext(conversationId: string): string {
+  // Chess: scan for any active game whose session key starts with the conversation
+  // The chess handler stores games keyed by sessionId = "session-{conversationId}-{timestamp}"
+  const games = chessHandler as unknown as { games: Map<string, unknown> };
+  if (games.games) {
+    for (const [key] of games.games) {
+      if (key.startsWith(`session-${conversationId}-`)) {
+        const state = chessHandler.getActiveGameState(key);
+        if (state) {
+          return `\n\n## Active App Context\nThere is an active chess game. Current state:\n- FEN: ${state.fen}\n- Turn: ${state.turn}\n- Move history: ${state.history?.join(', ') || 'none'}\n- Material: ${state.material}\nUse this context to help the user if they ask about the game.`;
+        }
+      }
+    }
+  }
+  return '';
 }
 
 export async function POST(request: NextRequest) {
@@ -63,10 +94,13 @@ export async function POST(request: NextRequest) {
     const discoveredTools = await toolService.discoverTools();
     const llmTools = toolService.formatForLLM(discoveredTools);
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: `You are a helpful educational assistant on the TutorMeAI platform.
+    // Build context retention: inject completed app session summaries
+    const appSummaryContext = await completionService.buildContextWithSummaries(conversationId);
+
+    // Build mid-app assistance: inject active app state
+    const activeAppContext = getActiveAppContext(conversationId);
+
+    const systemPrompt = `You are a helpful educational assistant on the TutorMeAI platform.
 
 ## Available Tools
 You have access to tools from registered apps. Use them when the user's request clearly matches a tool's purpose.
@@ -77,8 +111,12 @@ You have access to tools from registered apps. Use them when the user's request 
 - Never invoke tools for unrelated queries.
 - After a tool returns results, summarize them naturally for the user.
 - For chess: use the chess__start_game tool to begin, chess__make_move to play moves, chess__get_board_state to analyze.
-- For weather: use weather__get_weather with a location parameter.`,
-      },
+- For weather: use weather__get_weather with a location parameter.
+- For spotify: first check auth with spotify__get_auth_status, then use spotify__create_playlist with name, mood, and optional track_count.
+- If a Spotify action requires authentication, tell the user they need to connect their Spotify account first and provide the auth URL from the tool result.${appSummaryContext ? `\n\n${appSummaryContext}` : ''}${activeAppContext}`;
+
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
       ...conversation.messages.map((m) => ({
         role: m.role as 'user' | 'assistant' | 'system',
         content: m.content,
@@ -112,14 +150,20 @@ You have access to tools from registered apps. Use them when the user's request 
             for (const tc of toolCalls) {
               if (tc.type !== 'function') continue;
               const args = JSON.parse(tc.function.arguments || '{}');
-              const { result, appSlug, toolName } = await handleToolCall(tc.function.name, args, sessionId);
+              const { result, appSlug, toolName } = await handleToolCall(
+                tc.function.name,
+                args,
+                sessionId,
+                userId,
+                conversationId
+              );
 
               // Send tool invocation event to client
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result })}\n\n`)
               );
 
-              // If this is a chess start_game, send app_render to show the board iframe
+              // Send app_render for apps that have a UI component
               if (appSlug === 'chess' && toolName === 'start_game') {
                 controller.enqueue(
                   encoder.encode(
@@ -127,6 +171,17 @@ You have access to tools from registered apps. Use them when the user's request 
                       type: 'app_render',
                       appSlug: 'chess',
                       iframeUrl: '/apps/chess',
+                      sessionId,
+                    })}\n\n`
+                  )
+                );
+              } else if (appSlug === 'spotify' && toolName === 'create_playlist') {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: 'app_render',
+                      appSlug: 'spotify',
+                      iframeUrl: '/apps/spotify',
                       sessionId,
                     })}\n\n`
                   )

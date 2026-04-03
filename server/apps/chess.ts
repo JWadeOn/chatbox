@@ -227,4 +227,24 @@ export class ChessToolHandler {
   getGame(sessionId: string): ChessGame | undefined {
     return this.games.get(sessionId);
   }
+
+  /** Get active game state for mid-app assistance context injection. */
+  getActiveGameState(sessionId: string): {
+    fen: string;
+    turn: string;
+    history: string[];
+    material: string;
+  } | null {
+    const game = this.games.get(sessionId);
+    if (!game || game.isGameOver()) return null;
+    const state = game.getBoardState();
+    const adv = state.material_balance.advantage;
+    const material = adv > 0 ? `White +${adv}` : adv < 0 ? `Black +${-adv}` : 'even';
+    return {
+      fen: state.board_fen,
+      turn: state.current_turn,
+      history: state.move_history,
+      material,
+    };
+  }
 }

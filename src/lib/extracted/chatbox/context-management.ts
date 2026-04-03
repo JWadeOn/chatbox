@@ -129,9 +129,10 @@ export function cleanToolCallParts(
   messages: ChatMessageViewModel[],
   keepRounds: number = 2
 ): ChatMessageViewModel[] {
-  // Find the boundary: the Nth-from-last user message
+  // Find the boundary: everything before the Nth-from-last user message gets cleaned.
+  // If there aren't enough rounds, keep everything (boundaryIndex = -1 means nothing is old).
   let userCount = 0;
-  let boundaryIndex = messages.length;
+  let boundaryIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'user') {
       userCount++;
@@ -141,6 +142,9 @@ export function cleanToolCallParts(
       }
     }
   }
+
+  // If no boundary found, all messages are within keepRounds — nothing to clean
+  if (boundaryIndex < 0) return messages;
 
   return messages.map((msg, idx) => {
     if (idx >= boundaryIndex) return msg;

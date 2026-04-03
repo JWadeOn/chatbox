@@ -72,6 +72,43 @@ const WEATHER_APP = {
   ],
 };
 
+const SPOTIFY_APP = {
+  slug: 'spotify',
+  name: 'Spotify',
+  description: 'Create and manage Spotify playlists based on mood',
+  authType: 'oauth2',
+  iframeUrl: '/apps/spotify',
+  oauthConfig: {
+    authorizationUrl: 'https://accounts.spotify.com/authorize',
+    tokenUrl: 'https://accounts.spotify.com/api/token',
+    scopes: ['playlist-modify-public', 'playlist-modify-private'],
+  },
+  toolSchemas: [
+    {
+      name: 'get_auth_status',
+      description: 'Check if the user has connected their Spotify account. Returns auth status and auth URL if needed.',
+      parameters: { type: 'object', properties: {} },
+    },
+    {
+      name: 'create_playlist',
+      description: 'Create a Spotify playlist with tracks matching a mood. Requires Spotify authentication.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name for the playlist' },
+          mood: {
+            type: 'string',
+            enum: ['relaxed', 'energetic', 'focused'],
+            description: 'Mood of the playlist (relaxed, energetic, or focused)',
+          },
+          track_count: { type: 'number', description: 'Number of tracks (default: 10)' },
+        },
+        required: ['name', 'mood'],
+      },
+    },
+  ],
+};
+
 async function seed() {
   // Seed demo user
   console.info('Seeding demo user...');
@@ -107,6 +144,16 @@ async function seed() {
   } else {
     await db.insert(apps).values(WEATHER_APP);
     console.info('Weather app registered.');
+  }
+
+  // Seed spotify app
+  console.info('Seeding spotify app...');
+  const existingSpotify = await db.select().from(apps).where(eq(apps.slug, 'spotify')).limit(1);
+  if (existingSpotify.length > 0) {
+    console.info('Spotify app already exists, skipping.');
+  } else {
+    await db.insert(apps).values(SPOTIFY_APP);
+    console.info('Spotify app registered.');
   }
 
   await pool.end();
