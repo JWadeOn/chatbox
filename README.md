@@ -21,6 +21,19 @@ pnpm db:push
 pnpm dev
 ```
 
+### Test Credentials
+
+A demo account is seeded if you run the API manually, or register via the UI:
+
+| Field | Value |
+|---|---|
+| Email | `demo@chatbridge.dev` |
+| Password | `password123` |
+| Display Name | Demo User |
+| Role | student |
+
+Or create a new account from the login page — click "Sign up" and fill in the form.
+
 ## Architecture
 
 ```
