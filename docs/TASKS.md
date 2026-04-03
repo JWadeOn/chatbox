@@ -124,7 +124,7 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T12: Completion signaling (L) [WS-C] ← T09, T11 (both done)
+- [~] T13: Chess app — end-to-end lifecycle (XL) [WS-D] ← T12 (done)
 
 ---
 
@@ -179,14 +179,14 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > The #1 failure point. Connects iframe lifecycle back to chat context.
 
-- [ ] T12: Completion signaling — app_complete handling (session completed, summary persisted, iframe removed, intent resolved, system message injected), app_state_update for context bridge, 60s timeout monitor, context_summary injection into LLM (replacing full tool history), follow-up conversation referencing results (L) [WS-C] ← T09, T11
+- [x] T12: Completion signaling — app_complete handling (session completed, summary persisted, iframe removed, intent resolved, system message injected), app_state_update for context bridge, 60s timeout monitor, context_summary injection into LLM (replacing full tool history), follow-up conversation referencing results (L) [WS-C] ← T09, T11 — done 2026-04-02
 
 ## Layer 8 — Chess + Error Handling (deadline: Early Fri)
 
 > Full vertical slice. Chess must pass ALL lifecycle tests. Error handling can run in parallel.
 
 - [ ] T13: Chess app (end-to-end lifecycle) — chess.js game logic, interactive board UI in iframe, start_game/make_move/get_board_state/resign tools, FEN state management, completion on checkmate/resign, intent transitions, full state machine cycle (XL) [WS-D] ← T12
-- [ ] T16: Error handling — circuit breaker (3 failures → open, 30s → half-open), timeout strategy (iframe 10s, tool 15s, OAuth 60s, WS heartbeat 30s), LLM recovery prompts on failure, WS auto-reconnect (L) [WS-E] ← T09
+- [x] T16: Error handling — circuit breaker (3 failures → open, 30s → half-open), timeout strategy (iframe 10s, tool 15s, OAuth 60s, WS heartbeat 30s), LLM recovery prompts on failure, WS auto-reconnect (L) [WS-E] ← T09 — done 2026-04-02
 
 ## Layer 9 — Weather App (deadline: Early Fri)
 
@@ -248,6 +248,10 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 - [x] T06: App registration (M) [WS-B] — done 2026-04-02. Unblocked: T07.
 - [x] T04: WebSocket chat + LLM streaming (L) [WS-A] — done 2026-04-02. Unblocked: T11.
 - [x] T07: Tool discovery (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T08+T10 — already done).
+- [x] T09: Tool router (XL) [WS-B] — done 2026-04-02. Unblocked: T12, T16.
+- [x] T11: Iframe + postMessage (L) [WS-C] — done 2026-04-02. Unblocked: T12.
+- [x] T12: Completion signaling (L) [WS-C] — done 2026-04-02. Unblocked: T13 (chess).
+- [x] T16: Error handling (L) [WS-E] — done 2026-04-02.
 
 ---
 
