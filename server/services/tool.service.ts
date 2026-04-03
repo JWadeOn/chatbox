@@ -55,9 +55,23 @@ export class ToolService {
       function: {
         name: tool.namespacedName,
         description: tool.description,
-        parameters: tool.parameters,
+        parameters: this.normalizeParameters(tool.parameters),
       },
     }));
+  }
+
+  /** Ensure parameters conform to JSON Schema with type: "object" */
+  private normalizeParameters(params: Record<string, unknown>): Record<string, unknown> {
+    // Already valid JSON Schema
+    if (params.type === 'object') return params;
+
+    // Empty params
+    if (!params || Object.keys(params).length === 0) {
+      return { type: 'object', properties: {} };
+    }
+
+    // Flat properties without wrapper — wrap them
+    return { type: 'object', properties: params };
   }
 }
 
