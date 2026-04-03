@@ -8,9 +8,7 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://localhost:5432/ch
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool, { schema });
 
-afterAll(async () => {
-  await pool.end();
-});
+afterAll(async () => {});
 
 describe('database schema', () => {
   it('has all 8 required tables', async () => {

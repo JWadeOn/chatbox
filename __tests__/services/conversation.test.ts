@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { db, pool } from '../../server/lib/db';
+import { db } from '../../server/lib/db';
 import { conversations, messages, users } from '../../server/lib/schema';
 import { ConversationService } from '../../server/services/conversation.service';
 
@@ -28,7 +28,6 @@ afterAll(async () => {
   await db.delete(conversations);
   await db.delete(users).where(eq(users.id, testUserId));
   await db.delete(users).where(eq(users.id, testUser2Id));
-  await pool.end();
 });
 
 describe('ConversationService.create', () => {

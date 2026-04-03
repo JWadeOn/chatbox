@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { db, pool } from '../../server/lib/db';
+import { db } from '../../server/lib/db';
 import { apps, conversations, intents, users } from '../../server/lib/schema';
 import { IntentService } from '../../server/services/intent.service';
 
@@ -16,7 +16,7 @@ beforeAll(async () => {
   const [user] = await db
     .insert(users)
     .values({
-      email: 'intent-test-user@chatbridge-test.local',
+      email: `intent-test-${Date.now()}@chatbridge-test.local`,
       passwordHash: 'hashed-password',
       displayName: 'Intent Test User',
     })
@@ -40,7 +40,7 @@ beforeAll(async () => {
   const [app] = await db
     .insert(apps)
     .values({
-      slug: 'intent-test-app',
+      slug: `intent-test-app-${Date.now()}`,
       name: 'Intent Test App',
       description: 'App for intent service tests',
       authType: 'none',
@@ -58,7 +58,6 @@ afterAll(async () => {
   await db.delete(conversations).where(eq(conversations.id, testConversation2Id));
   await db.delete(apps).where(eq(apps.id, testAppId));
   await db.delete(users).where(eq(users.id, testUserId));
-  await pool.end();
 });
 
 describe('IntentService', () => {

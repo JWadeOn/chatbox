@@ -1,6 +1,6 @@
 import { inArray } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
-import { db, pool } from '../../server/lib/db';
+import { db } from '../../server/lib/db';
 import { apps } from '../../server/lib/schema';
 import { ToolService } from '../../server/services/tool.service';
 
@@ -85,7 +85,6 @@ const seeded = seedTestApps();
 
 afterAll(async () => {
   await db.delete(apps).where(inArray(apps.slug, testSlugs));
-  await pool.end();
 });
 
 describe('ToolService.discoverTools', () => {

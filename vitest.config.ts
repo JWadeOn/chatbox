@@ -7,6 +7,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'server/**/*.test.ts', '__tests__/**/*.test.ts'],
     exclude: ['node_modules', 'chatbox', '.next'],
     testTimeout: 10000,
+    setupFiles: ['./vitest.setup.ts'],
+    fileParallelism: false,
   },
   resolve: {
     alias: {

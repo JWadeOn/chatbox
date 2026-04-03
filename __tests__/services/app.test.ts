@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
-import { db, pool } from '../../server/lib/db';
+import { db } from '../../server/lib/db';
 import { apps } from '../../server/lib/schema';
 import { AppError, AppService } from '../../server/services/app.service';
 
@@ -26,7 +26,6 @@ afterAll(async () => {
   await db.delete(apps).where(eq(apps.slug, TEST_SLUG));
   await db.delete(apps).where(eq(apps.slug, TEST_SLUG_2));
   await db.delete(apps).where(eq(apps.slug, TEST_SLUG_INVALID));
-  await pool.end();
 });
 
 describe('AppService.register', () => {

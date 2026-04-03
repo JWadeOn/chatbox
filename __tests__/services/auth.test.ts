@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
-import { db, pool } from '../../server/lib/db';
+import { db } from '../../server/lib/db';
 import { users } from '../../server/lib/schema';
 import { AuthError, AuthService } from '../../server/services/auth.service';
 
@@ -12,7 +12,6 @@ let registeredToken: string;
 afterAll(async () => {
   await db.delete(users).where(eq(users.email, TEST_EMAIL));
   await db.delete(users).where(eq(users.email, TEST_EMAIL_2));
-  await pool.end();
 });
 
 describe('AuthService.register', () => {
