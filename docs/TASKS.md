@@ -124,7 +124,9 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [~] T13: Chess app — end-to-end lifecycle (XL) [WS-D] ← T12 (done)
+- [ ] T18: UI polish (M) [WS-E] ← T15 (done)
+- [ ] T19: Documentation (M) [WS-E] ← T15 (done)
+- [ ] T20: Deployment (M) [WS-E] ← T15 (done)
 
 ---
 
@@ -185,21 +187,21 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > Full vertical slice. Chess must pass ALL lifecycle tests. Error handling can run in parallel.
 
-- [ ] T13: Chess app (end-to-end lifecycle) — chess.js game logic, interactive board UI in iframe, start_game/make_move/get_board_state/resign tools, FEN state management, completion on checkmate/resign, intent transitions, full state machine cycle (XL) [WS-D] ← T12
+- [x] T13: Chess app (end-to-end lifecycle) — chess.js game logic, interactive board UI in iframe, start_game/make_move/get_board_state/resign tools, FEN state management, completion on checkmate/resign, intent transitions, full state machine cycle (XL) [WS-D] ← T12 — done 2026-04-02
 - [x] T16: Error handling — circuit breaker (3 failures → open, 30s → half-open), timeout strategy (iframe 10s, tool 15s, OAuth 60s, WS heartbeat 30s), LLM recovery prompts on failure, WS auto-reconnect (L) [WS-E] ← T09 — done 2026-04-02
 
 ## Layer 9 — Weather App (deadline: Early Fri)
 
 > GATE: Do not start until ALL chess lifecycle tests pass (vertical slice rule).
 
-- [ ] T14: Weather app — get_weather tool, location parameter, external weather API, result display in chat, no auth required, verify chess context_summary still available after switching (M) [WS-D] ← T13
+- [x] T14: Weather app — get_weather tool, location parameter, external weather API, result display in chat, no auth required, verify chess context_summary still available after switching (M) [WS-D] ← T13 — done 2026-04-02
 
 ## Layer 10 — Spotify + Multi-App (deadline: Final Sun)
 
 > OAuth flow integration. Multi-app switching can run in parallel.
 
-- [ ] T15: Spotify app (OAuth) — get_auth_status/create_playlist tools, OAuth2 proxy (authorize/callback/status endpoints), token storage in oauth_tokens, CSRF protection via nonce, token refresh on expiry (L) [WS-D] ← T14
-- [ ] T17: Multi-app switching — session context preservation across app switches, single-active-app enforcement on switch, ambiguity resolution (clarification prompt), unrelated query refusal (M) [WS-E] ← T14
+- [x] T15: Spotify app (OAuth) — get_auth_status/create_playlist tools, OAuth2 proxy (authorize/callback/status endpoints), token storage in oauth_tokens, CSRF protection via nonce, token refresh on expiry (L) [WS-D] ← T14 — done 2026-04-02
+- [x] T17: Multi-app switching — session context preservation across app switches, single-active-app enforcement on switch, ambiguity resolution (clarification prompt), unrelated query refusal (M) [WS-E] ← T14 — done 2026-04-02
 
 ## Layer 11 — Polish & Ship (deadline: Final Sun)
 
@@ -252,6 +254,10 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 - [x] T11: Iframe + postMessage (L) [WS-C] — done 2026-04-02. Unblocked: T12.
 - [x] T12: Completion signaling (L) [WS-C] — done 2026-04-02. Unblocked: T13 (chess).
 - [x] T16: Error handling (L) [WS-E] — done 2026-04-02.
+- [x] T13: Chess app (XL) [WS-D] — done 2026-04-02. Vertical slice gate cleared. Unblocked: T14.
+- [x] T14: Weather app (M) [WS-D] — done 2026-04-02. Unblocked: T15, T17.
+- [x] T15: Spotify/OAuth (L) [WS-D] — done 2026-04-02. Unblocked: T18, T19, T20.
+- [x] T17: Multi-app switching (M) [WS-E] — done 2026-04-02.
 
 ---
 
