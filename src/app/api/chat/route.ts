@@ -1,9 +1,38 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { ChessToolHandler } from '../../../../server/apps/chess';
+import { WeatherToolHandler } from '../../../../server/apps/weather';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
 import { conversationService } from '../../../../server/services/conversation.service';
+import { toolService } from '../../../../server/services/tool.service';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+
+// App tool handlers (keyed by app slug)
+const chessHandler = new ChessToolHandler();
+const weatherHandler = new WeatherToolHandler();
+
+async function handleToolCall(
+  namespacedName: string,
+  args: Record<string, unknown>,
+  sessionId: string
+): Promise<{ result: unknown; appSlug: string; toolName: string }> {
+  const [appSlug, toolName] = namespacedName.split('__');
+
+  let result: unknown;
+  switch (appSlug) {
+    case 'chess':
+      result = await chessHandler.handleToolInvoke(sessionId, toolName, args);
+      break;
+    case 'weather':
+      result = await weatherHandler.handleToolInvoke(toolName, args);
+      break;
+    default:
+      result = { error: `No handler for app: ${appSlug}` };
+  }
+
+  return { result, appSlug, toolName };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +41,13 @@ export async function POST(request: NextRequest) {
 
     if (!conversationId || !content) {
       return NextResponse.json({ error: 'Missing conversationId or content' }, { status: 400 });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OPENAI_API_KEY not configured. Add it to .env.local and restart.' },
+        { status: 503 }
+      );
     }
 
     // Persist user message
@@ -23,51 +59,106 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
+    // Discover registered tools
+    const discoveredTools = await toolService.discoverTools();
+    const llmTools = toolService.formatForLLM(discoveredTools);
+
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: 'system', content: 'You are a helpful educational assistant on the TutorMeAI platform.' },
+      {
+        role: 'system',
+        content: `You are a helpful educational assistant on the TutorMeAI platform.
+
+## Available Tools
+You have access to tools from registered apps. Use them when the user's request clearly matches a tool's purpose.
+
+## Rules
+- Only invoke tools when the user's request clearly matches a tool's purpose.
+- If a request is ambiguous between multiple tools, ask for clarification.
+- Never invoke tools for unrelated queries.
+- After a tool returns results, summarize them naturally for the user.
+- For chess: use the chess__start_game tool to begin, chess__make_move to play moves, chess__get_board_state to analyze.
+- For weather: use weather__get_weather with a location parameter.`,
+      },
       ...conversation.messages.map((m) => ({
         role: m.role as 'user' | 'assistant' | 'system',
         content: m.content,
       })),
     ];
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'OPENAI_API_KEY not configured. Add it to .env.local and restart.' },
-        { status: 503 }
-      );
-    }
-
-    // Stream response
-    let stream: Awaited<ReturnType<typeof openai.chat.completions.create>>;
-    try {
-      stream = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages,
-        stream: true,
-      });
-    } catch (llmError) {
-      const msg = llmError instanceof Error ? llmError.message : 'LLM request failed';
-      return NextResponse.json({ error: `OpenAI error: ${msg}` }, { status: 502 });
-    }
-
     const encoder = new TextEncoder();
+    const sessionId = `session-${conversationId}-${Date.now()}`;
+
     const readable = new ReadableStream({
       async start(controller) {
-        let fullContent = '';
         try {
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) {
-              fullContent += delta;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: delta })}\n\n`));
+          let response = await openai.chat.completions.create({
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            messages,
+            stream: false,
+            ...(llmTools.length > 0 ? { tools: llmTools } : {}),
+          });
+
+          let retries = 0;
+          const MAX_RETRIES = 2;
+
+          // Tool call loop — handle function calls until the LLM gives a text response
+          while (response.choices[0]?.message?.tool_calls && retries < MAX_RETRIES) {
+            const toolCalls = response.choices[0].message.tool_calls;
+
+            // Add assistant message with tool calls to context
+            messages.push(response.choices[0].message);
+
+            // Process each tool call
+            for (const tc of toolCalls) {
+              const args = JSON.parse(tc.function.arguments || '{}');
+              const { result, appSlug, toolName } = await handleToolCall(tc.function.name, args, sessionId);
+
+              // Send tool invocation event to client
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result })}\n\n`)
+              );
+
+              // Add tool result to context
+              messages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: JSON.stringify(result),
+              });
             }
+
+            // Get next LLM response with tool results
+            response = await openai.chat.completions.create({
+              model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+              messages,
+              stream: false,
+              ...(llmTools.length > 0 ? { tools: llmTools } : {}),
+            });
+
+            retries++;
           }
-          // Persist assistant message
-          await conversationService.addMessage(conversationId, 'assistant', fullContent);
+
+          // Stream the final text response
+          const finalContent = response.choices[0]?.message?.content || '';
+          if (finalContent) {
+            // Stream it in chunks for a natural feel
+            const words = finalContent.split(' ');
+            let sent = '';
+            for (let i = 0; i < words.length; i++) {
+              const chunk = (i === 0 ? '' : ' ') + words[i];
+              sent += chunk;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
+              // Small delay for streaming effect
+              await new Promise((r) => setTimeout(r, 15));
+            }
+
+            // Persist assistant message
+            await conversationService.addMessage(conversationId, 'assistant', sent.trim());
+          }
+
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Stream error';
+          console.error('[chat] Error:', msg);
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
         } finally {
           controller.close();

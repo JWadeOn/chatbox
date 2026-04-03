@@ -93,7 +93,24 @@ export function useChat({ conversationId, token }: UseChatOptions) {
             const json = line.slice(6);
             try {
               const data = JSON.parse(json);
-              if (data.content) {
+              if (data.type === 'tool_call') {
+                // Insert a system message showing the tool invocation
+                const toolMsg: Message = {
+                  id: `tool-${Date.now()}-${Math.random()}`,
+                  role: 'system',
+                  content: `[${data.appSlug}] ${data.toolName}(${JSON.stringify(data.args)}) → ${JSON.stringify(data.result)}`,
+                };
+                setMessages((prev) => {
+                  // Insert before the assistant placeholder
+                  const idx = prev.findIndex((m) => m.id === assistantMsgId);
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    copy.splice(idx, 0, toolMsg);
+                    return copy;
+                  }
+                  return [...prev, toolMsg];
+                });
+              } else if (data.content) {
                 assistantContent += data.content;
                 setMessages((prev) =>
                   prev.map((m) => (m.id === assistantMsgId ? { ...m, content: assistantContent } : m))
