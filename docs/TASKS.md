@@ -124,8 +124,8 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T03: Conversation CRUD (M) [WS-A] ← T02 (done)
-- [ ] T06: App registration (M) [WS-B] ← T05 (done)
+- [ ] T04: WebSocket chat + LLM streaming (L) [WS-A] ← T03 (done)
+- [ ] T07: Tool discovery (M) [WS-B] ← T06 (done)
 
 ---
 
@@ -154,8 +154,8 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > Requires auth (T02) or sanitizer (T05) to be complete.
 
-- [ ] T03: Conversation CRUD — create/list/get/delete conversations, user isolation (only own conversations), message inclusion on get, ordered by updated_at DESC (M) [WS-A] ← T02
-- [ ] T06: App registration — POST/GET/PUT/DELETE for app registry, slug uniqueness, tool schema validation + sanitization on register, auth_type handling (M) [WS-B] ← T05
+- [x] T03: Conversation CRUD — create/list/get/delete conversations, user isolation (only own conversations), message inclusion on get, ordered by updated_at DESC (M) [WS-A] ← T02 — done 2026-04-02
+- [x] T06: App registration — POST/GET/PUT/DELETE for app registry, slug uniqueness, tool schema validation + sanitization on register, auth_type handling (M) [WS-B] ← T05 — done 2026-04-02
 
 ## Layer 4 — Real-Time + Discovery (deadline: Early Fri)
 
@@ -245,6 +245,8 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 - [x] T05: Tool schema sanitizer (S) [WS-B] — done 2026-04-02. Unblocked: T06.
 - [x] T08: Invocation state machine (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T07+T10).
 - [x] T10: Intent service (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T07+T08).
+- [x] T03: Conversation CRUD (M) [WS-A] — done 2026-04-02. Unblocked: T04.
+- [x] T06: App registration (M) [WS-B] — done 2026-04-02. Unblocked: T07.
 
 ---
 
