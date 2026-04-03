@@ -114,7 +114,7 @@ export function AppRenderer({
       </div>
       <iframe
         ref={iframeRef}
-        src={`${iframeUrl}?sessionId=${sessionId}`}
+        src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}?sessionId=${sessionId}`}
         /* Internal apps (same-origin) need allow-same-origin to load.
            Third-party apps served from external domains should NOT get allow-same-origin. */
         sandbox={
