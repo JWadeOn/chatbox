@@ -118,6 +118,20 @@ You have access to tools from registered apps. Use them when the user's request 
                 encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result })}\n\n`)
               );
 
+              // If this is a chess start_game, send app_render to show the board iframe
+              if (appSlug === 'chess' && toolName === 'start_game') {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: 'app_render',
+                      appSlug: 'chess',
+                      iframeUrl: '/apps/chess',
+                      sessionId,
+                    })}\n\n`
+                  )
+                );
+              }
+
               // Add tool result to context
               messages.push({
                 role: 'tool',

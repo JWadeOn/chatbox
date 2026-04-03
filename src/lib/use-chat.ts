@@ -110,6 +110,13 @@ export function useChat({ conversationId, token }: UseChatOptions) {
                   }
                   return [...prev, toolMsg];
                 });
+              } else if (data.type === 'app_render') {
+                setAppEmbed({
+                  appId: data.appSlug,
+                  appSlug: data.appSlug,
+                  iframeUrl: data.iframeUrl,
+                  sessionId: data.sessionId,
+                });
               } else if (data.content) {
                 assistantContent += data.content;
                 setMessages((prev) =>
