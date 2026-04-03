@@ -1,0 +1,1 @@
+Conventions, PR process, code style expectations. Helpful for AI agents to follow your team's norms.
