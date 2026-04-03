@@ -1,7 +1,24 @@
+'use client';
+
+import { AuthForm } from '@/components/auth/AuthForm';
+import { ChatApp } from '@/components/chat/ChatApp';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useAuth } from '@/lib/auth-context';
+
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-4xl font-bold">ChatBridge</h1>
-    </main>
-  );
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner size="lg" label="Loading..." />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthForm />;
+  }
+
+  return <ChatApp />;
 }
