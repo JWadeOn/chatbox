@@ -50,7 +50,7 @@ export default function ChessApp() {
   const [status, setStatus] = useState('Waiting to start...');
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [gameOver, setGameOver] = useState(false);
-  const readyRef = useRef(false);
+  const _readyRef = useRef(false);
 
   const flipped = playerColor === 'black';
   const board = fenToBoard(fen);
@@ -159,12 +159,17 @@ export default function ChessApp() {
     return () => window.removeEventListener('message', handler);
   }, [fen, moveHistory, sendToParent]);
 
-  // Signal iframe_ready
+  // Signal iframe_ready — retry every 500ms until parent acknowledges
   useEffect(() => {
-    if (!readyRef.current) {
-      readyRef.current = true;
-      sendToParent({ jsonrpc: '2.0', method: 'iframe_ready', params: {} });
-    }
+    const signal = () => sendToParent({ jsonrpc: '2.0', method: 'iframe_ready', params: {} });
+    signal();
+    const interval = setInterval(signal, 500);
+    // Stop after 15s
+    const timeout = setTimeout(() => clearInterval(interval), 15000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
   }, [sendToParent]);
 
   const handleSquareClick = useCallback(

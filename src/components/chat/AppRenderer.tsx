@@ -83,10 +83,10 @@ export function AppRenderer({
     bufferRef.current = new InvocationBuffer(
       (msg) => sendToIframe(msg as ReturnType<typeof createToolInvokeMessage>),
       () => {
-        setError('App failed to load within 10 seconds');
+        setError('App failed to load. Click Retry.');
         setLoading(false);
       },
-      10000
+      30000
     );
 
     return () => {
