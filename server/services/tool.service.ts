@@ -62,16 +62,55 @@ export class ToolService {
 
   /** Ensure parameters conform to JSON Schema with type: "object" */
   private normalizeParameters(params: Record<string, unknown>): Record<string, unknown> {
-    // Already valid JSON Schema
-    if (params.type === 'object') return params;
-
     // Empty params
     if (!params || Object.keys(params).length === 0) {
       return { type: 'object', properties: {} };
     }
 
-    // Flat properties without wrapper — wrap them
-    return { type: 'object', properties: params };
+    // Already valid JSON Schema with type: "object" and properties
+    if (params.type === 'object' && params.properties) {
+      // Strip any `required: true` from individual properties (invalid JSON Schema)
+      const props = params.properties as Record<string, Record<string, unknown>>;
+      const cleanProps: Record<string, Record<string, unknown>> = {};
+      const requiredFields: string[] = (params.required as string[]) || [];
+
+      for (const [key, val] of Object.entries(props)) {
+        const { required: _req, ...rest } = val;
+        cleanProps[key] = rest;
+        if (_req === true && !requiredFields.includes(key)) {
+          requiredFields.push(key);
+        }
+      }
+
+      return {
+        type: 'object',
+        properties: cleanProps,
+        ...(requiredFields.length > 0 ? { required: requiredFields } : {}),
+      };
+    }
+
+    // Flat properties without wrapper — wrap them and extract required
+    const cleanProps: Record<string, Record<string, unknown>> = {};
+    const requiredFields: string[] = [];
+
+    for (const [key, val] of Object.entries(params)) {
+      if (typeof val === 'object' && val !== null) {
+        const propVal = val as Record<string, unknown>;
+        const { required: _req, ...rest } = propVal;
+        cleanProps[key] = rest;
+        if (_req === true) {
+          requiredFields.push(key);
+        }
+      } else {
+        cleanProps[key] = { type: 'string' };
+      }
+    }
+
+    return {
+      type: 'object',
+      properties: cleanProps,
+      ...(requiredFields.length > 0 ? { required: requiredFields } : {}),
+    };
   }
 }
 
