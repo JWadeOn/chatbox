@@ -39,15 +39,16 @@ export function AppRenderer({
         : never
     ) => {
       if (iframeRef.current?.contentWindow) {
-        const origin = new URL(iframeUrl).origin;
-        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), origin);
+        const resolvedUrl = iframeUrl.startsWith('/') ? `${window.location.origin}${iframeUrl}` : iframeUrl;
+        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), new URL(resolvedUrl).origin);
       }
     },
     [iframeUrl]
   );
 
   useEffect(() => {
-    const origin = new URL(iframeUrl).origin;
+    const resolvedUrl = iframeUrl.startsWith('/') ? `${window.location.origin}${iframeUrl}` : iframeUrl;
+    const origin = new URL(resolvedUrl).origin;
 
     const handlers: PostMessageHandler = {
       onToolResult,
@@ -114,7 +115,13 @@ export function AppRenderer({
       <iframe
         ref={iframeRef}
         src={`${iframeUrl}?sessionId=${sessionId}`}
-        sandbox="allow-scripts allow-forms allow-popups"
+        /* Internal apps (same-origin) need allow-same-origin to load.
+           Third-party apps served from external domains should NOT get allow-same-origin. */
+        sandbox={
+          iframeUrl.startsWith('/')
+            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
+            : 'allow-scripts allow-forms allow-popups'
+        }
         referrerPolicy="no-referrer"
         loading="lazy"
         title={`${appSlug} app`}
