@@ -1,5 +1,286 @@
 # ChatBridge — Product Requirements Document
 
+**Project:** ChatBridge — AI Chat Platform with Third-Party App Integration  
+**Context:** TutorMeAI case study (Gauntlet AI, Week 7)  
+**Sprint:** 7 days  
+**Status:** Draft, revised for brownfield execution
+
+---
+
+## 1. Problem Statement
+
+TutorMeAI needs more than a configurable chatbot. Its next defensible advantage is a chat experience that can launch and coordinate third-party learning tools without forcing students or teachers to leave the conversation.
+
+The hardest product problem is not chat itself. Chatbox already demonstrates that a polished AI chat interface, streaming replies, markdown rendering, and session-oriented UX can be delivered well. The harder problem is turning that foundation into a **safe orchestration platform**:
+
+- The system must launch third-party app experiences from natural language
+- The app must coexist with the conversation, not replace it
+- The platform must know when an app starts, updates, fails, or finishes
+- Teachers and platform operators must retain control over what is available
+- The trust boundary must hold for K-12 usage
+
+ChatBridge is therefore a **brownfield platform extension of Chatbox**. The product goal is to add orchestration, app lifecycle, and server authority on top of an existing chat foundation, not to spend the sprint rebuilding the chat client from scratch.
+
+---
+
+## 2. Product Goal
+
+Build a publicly accessible Chatbox-derived chat experience that can:
+
+1. Route a user request to an appropriate third-party app
+2. Render the app safely inside the chat experience
+3. Preserve conversational continuity before, during, and after the app interaction
+4. Support at least three app patterns:
+   - One complex stateful app (`Chess`)
+   - One public app with no user auth (`Weather` or equivalent)
+   - One OAuth-backed app (`Spotify` or equivalent)
+
+The product must prove that Chatbox can be extended into a platform, not just used as a UI reference.
+
+---
+
+## 3. Brownfield Product Constraint
+
+This requirement is foundational:
+
+- ChatBridge must build on top of Chatbox's strengths
+- Rebuilding solved Chatbox features is out of scope unless required by the new trust model
+- Reused code should become ChatBridge-owned code after extraction or adaptation; the runtime should not depend on `chatbox/` as a live import boundary
+
+**Implication:** Product requirements should prioritize new platform behavior over rebuilding baseline chat behavior.
+
+---
+
+## 4. Target Users
+
+| User | Needs | Constraints |
+|---|---|---|
+| Students (K-12) | Seamless app experiences inside chat, low-friction interaction, natural follow-up conversation | Limited patience, safety-sensitive, little tolerance for confusing state changes |
+| Teachers | Confidence that only approved apps are used and that student experience stays coherent | Need control, not engineering complexity |
+| Third-party developers | Clear app contract, predictable lifecycle, documentation, testability | Must operate inside a sandbox and platform-owned auth model |
+| Platform operators | Reliability, auditability, cost control, data minimization | Small team, high safety expectations, public demo requirement |
+
+---
+
+## 5. In Scope
+
+### Core Product Capabilities
+
+- Chatbox-derived chat UI with streaming responses
+- Persistent conversations and follow-up continuity
+- Server-authoritative chat orchestration
+- App invocation from natural language requests
+- App UI rendered inside the chat flow
+- Completion signaling so the conversation resumes naturally
+- Context retention after app completion
+- Graceful recovery from app failure, timeout, or invalid tool calls
+
+### Platform Capabilities
+
+- App registration with tool schemas and metadata
+- Tool discovery and routing
+- Invocation state tracking
+- Sandboxed iframe rendering with strict origin checks
+- OAuth proxy flow for authenticated apps
+- Teacher/operator control over enabled apps at a basic level
+
+### Required App Demonstrations
+
+- `Chess`: complex stateful app with ongoing back-and-forth
+- `Weather`: public or internal app with no user-specific auth
+- `Spotify`: OAuth-backed app proving delegated authorization flow
+
+### Brownfield Reuse Requirement
+
+The implementation should explicitly reuse or adapt Chatbox strengths where they accelerate delivery:
+
+- Chat transcript UX patterns
+- Streaming response presentation
+- Markdown rendering
+- Context management ideas
+- Token estimation / prompt-budget utilities where relevant
+
+---
+
+## 6. Out of Scope
+
+- Full rewrite of the chat shell for purely aesthetic reasons
+- Replacing Chatbox-derived interaction patterns before the app lifecycle works
+- Building an app marketplace
+- Deep teacher admin tooling beyond simple enable/disable controls
+- Mobile-native clients
+- Broad feature parity with full Chatbox desktop capabilities
+- Any second-wave app work before the Chess lifecycle is stable
+
+---
+
+## 7. User Stories
+
+### Student Flow
+
+**US-1: Start an app from conversation**  
+As a student, I can say "let's play chess" and the chess board appears inside the chat experience.
+
+**US-2: Stay in context mid-app**  
+As a student, I can ask "what should I do here?" during a chess game and the assistant answers using the current game state.
+
+**US-3: Resume conversation after app completion**  
+When the app interaction ends, the assistant can discuss what happened without losing context.
+
+**US-4: Switch tasks naturally**  
+After using one app, I can ask for a different tool and the assistant routes correctly without confusion.
+
+**US-5: Authenticate when needed**  
+If I ask for a Spotify action, the platform guides me through auth and resumes the task after authorization.
+
+### Chat / Platform Behavior
+
+**US-6: Route correctly**  
+When a request clearly matches an app capability, the platform invokes the right tool.
+
+**US-7: Ask for clarification**  
+When a request is ambiguous, the system asks instead of guessing.
+
+**US-8: Refuse unrelated app use**  
+The assistant does not invoke apps when normal chat is the correct response.
+
+**US-9: Recover gracefully**  
+If an app fails or times out, the assistant explains the issue and offers a recovery path.
+
+### Third-Party Developer Flow
+
+**US-10: Register an app**  
+A developer can define an app, its tools, and its UI endpoint through a documented contract.
+
+**US-11: Participate in a controlled lifecycle**  
+The app receives structured invocations and can send state updates and completion signals back to the platform.
+
+**US-12: Work within platform trust boundaries**  
+The app never receives raw platform credentials and does not own the OAuth flow.
+
+---
+
+## 8. Milestones
+
+### MVP
+
+Goal: prove the brownfield foundation is real and avoid silent rewrite.
+
+- Brownfield audit complete: reuse / adapt / rewrite boundaries documented
+- Chatbox-derived chat shell or interaction patterns preserved
+- One server-authoritative chat path works end to end
+- Baseline conversation persistence works
+- Architecture narrative clearly explains how Chatbox is being extended
+
+### Early Submission
+
+Goal: prove the vertical slice.
+
+- Tool discovery and invocation working
+- Sandboxed app rendering inside chat
+- Completion signaling working
+- Context retention after app completion
+- Chess fully works through its full lifecycle
+- Failure paths handled for the vertical slice
+
+### Final Submission
+
+Goal: prove breadth after reliability.
+
+- Weather app working
+- OAuth-backed app working
+- Basic app enablement controls present
+- Public deployment live
+- Developer-facing setup / integration docs written
+- Demo and cost analysis complete
+
+---
+
+## 9. Architecture Decisions
+
+| Decision Area | Product Direction | Rationale |
+|---|---|---|
+| Starting point | Brownfield on Chatbox | Reuse proven chat UX and avoid wasting the sprint on a rewrite |
+| Trust model | Server owns LLM calls and orchestration | Student-facing platform cannot rely on client-side privileged flows |
+| App rendering | Sandboxed iframe inside chat | Strongest boundary for untrusted third-party UI |
+| App communication | JSON-RPC 2.0 over `postMessage` | Structured lifecycle and cross-origin compatibility |
+| State model | Chat state, app state, context bridge | Preserves modularity and conversational continuity |
+| Delivery strategy | Vertical slice first (`Chess`) | Completion signaling is the highest-risk behavior |
+| Brownfield policy | Extract/adapt, do not live-import from `chatbox/` | Keeps ownership clear while still building on top of Chatbox |
+
+---
+
+## 10. Success Metrics
+
+### Must-Have Functional Outcomes
+
+- User can launch `Chess` from a chat message
+- App UI renders inside the conversation
+- User can ask about app state during interaction
+- App can signal completion and the conversation resumes
+- Follow-up questions reference app results
+- User can switch to another app afterward
+- OAuth flow works for at least one app
+
+### Brownfield Success Signals
+
+- The final product visibly retains Chatbox-derived interaction quality
+- The implementation reuses or adapts proven Chatbox concepts instead of silently replacing them
+- The team can clearly explain what was reused, what was added, and why
+
+### Reliability Signals
+
+- App failure does not crash the chat experience
+- Ambiguous requests are clarified
+- Unrelated requests do not trigger app invocations
+- Completion signaling and context retention are stable for the Chess slice
+
+---
+
+## 11. Technical Constraints
+
+- **Timeline:** 7 days, solo developer
+- **Security:** no `allow-same-origin` on untrusted app iframes
+- **Deployment:** must be publicly accessible
+- **Authority boundary:** all LLM calls must be server-side
+- **Codebase constraint:** build on top of Chatbox rather than replacing it wholesale
+- **Ownership rule:** copied or extracted code becomes ChatBridge-owned
+
+---
+
+## 12. Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| Brownfield drift becomes rewrite-by-accident | High | High | Keep reuse matrix explicit and review against it continuously |
+| Completion signaling proves brittle | High | High | Build and test the Chess lifecycle before wider app scope |
+| Hidden Chatbox coupling slows reuse | High | Medium | Timebox extraction attempts; rewrite only after failed isolation attempt |
+| Public deployment diverges from desktop assumptions | Medium | Medium | Reuse renderer patterns, not Electron runtime requirements |
+| OAuth flow complexity expands late | Medium | High | Defer OAuth app until after Chess is stable |
+
+---
+
+## 13. Build Priority
+
+1. Lock brownfield boundaries and reuse candidates
+2. Establish server-owned chat authority and persistence
+3. Add app registration and tool discovery
+4. Add iframe rendering and lifecycle messaging
+5. Prove `Chess` end to end
+6. Harden error handling and context retention
+7. Add `Weather`
+8. Add OAuth app
+9. Polish, document, deploy
+
+**Rule:** Do not broaden scope until `Chess` works all the way through launch, interaction, completion, and follow-up conversation.
+
+---
+
+## 14. Final Product Principle
+
+ChatBridge succeeds if it feels like **Chatbox evolved into a safe app platform**, not like a separate prototype that happens to live in the same repository.
+# ChatBridge — Product Requirements Document
+
 **Project:** ChatBridge — AI Chat Platform with Third-Party App Integration
 **Context:** TutorMeAI case study (Gauntlet AI, Week 7)
 **Sprint:** 7 days (MVP Tuesday, Early Friday, Final Sunday)

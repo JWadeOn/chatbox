@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatBridge — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&family=Satoshi:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a0b0f;
+    --bg-surface: #12141a;
+    --bg-elevated: #1a1d26;
+    --bg-hover: #222633;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-accent: rgba(139, 192, 255, 0.15);
+    --text-primary: #e8ecf4;
+    --text-secondary: #8a91a4;
+    --text-muted: #555b6e;
+    --accent-blue: #8bc0ff;
+    --accent-cyan: #6eecd8;
+    --accent-amber: #f5c562;
+    --accent-rose: #f28b9e;
+    --accent-violet: #b49aff;
+    --font-display: 'Instrument Serif', Georgia, serif;
+    --font-body: 'Satoshi', -apple-system, sans-serif;
+    --font-mono: 'DM Mono', 'SF Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-weight: 400;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 80px 40px 120px;
+  }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 100px;
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -50px;
+    left: 0;
+    width: 60px;
+    height: 1px;
+    background: var(--accent-blue);
+    opacity: 0.5;
+  }
+
+  .header .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    display: block;
+  }
+
+  .header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 7vw, 80px);
+    font-weight: 400;
+    line-height: 1.05;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .header h1 em {
+    font-style: italic;
+    color: var(--accent-blue);
+  }
+
+  .header p {
+    margin-top: 24px;
+    font-size: 17px;
+    color: var(--text-secondary);
+    max-width: 540px;
+    line-height: 1.8;
+  }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 100px;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  .section h2 {
+    font-family: var(--font-display);
+    font-size: 38px;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: 40px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Tech Stack Table ── */
+  .stack-grid {
+    display: grid;
+    gap: 1px;
+    background: var(--border-subtle);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .stack-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    background: var(--bg-surface);
+    transition: background 0.2s ease;
+  }
+
+  .stack-row:hover {
+    background: var(--bg-elevated);
+  }
+
+  .stack-row .layer {
+    padding: 18px 24px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent-blue);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+  }
+
+  .stack-row .tech {
+    padding: 18px 24px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .stack-row .tech .tag {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-subtle);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    font-weight: 300;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  /* ── Architecture Diagram ── */
+  .diagram-container {
+    position: relative;
+    padding: 48px 0;
+  }
+
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: relative;
+  }
+
+  .diagram-tier {
+    position: relative;
+  }
+
+  .tier-header {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    padding-left: 4px;
+  }
+
+  .tier-box {
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 32px;
+    background: var(--bg-surface);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tier-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+  }
+
+  .tier-client .tier-box::before { background: linear-gradient(90deg, var(--accent-blue), transparent 60%); }
+  .tier-server .tier-box::before { background: linear-gradient(90deg, var(--accent-amber), transparent 60%); }
+  .tier-db .tier-box::before { background: linear-gradient(90deg, var(--accent-cyan), transparent 60%); }
+
+  .tier-inner {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .node {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 20px 24px;
+    flex: 1;
+    min-width: 180px;
+    transition: border-color 0.3s ease, transform 0.2s ease;
+  }
+
+  .node:hover {
+    border-color: var(--border-accent);
+    transform: translateY(-2px);
+  }
+
+  .node-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .node-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-blue { background: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
+  .dot-amber { background: var(--accent-amber); box-shadow: 0 0 8px var(--accent-amber); }
+  .dot-cyan { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan); }
+  .dot-rose { background: var(--accent-rose); box-shadow: 0 0 8px var(--accent-rose); }
+  .dot-violet { background: var(--accent-violet); box-shadow: 0 0 8px var(--accent-violet); }
+
+  .node-desc {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Connectors between tiers */
+  .connector {
+    display: flex;
+    justify-content: center;
+    padding: 0 32px;
+    height: 24px;
+    position: relative;
+  }
+
+  .connector-line {
+    width: 1px;
+    height: 100%;
+    position: relative;
+  }
+
+  .connector-line::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--border-subtle), var(--text-muted), var(--border-subtle));
+  }
+
+  .connector-line::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px;
+    height: 7px;
+    border-right: 1px solid var(--text-muted);
+    border-bottom: 1px solid var(--text-muted);
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .connector-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--bg-deep);
+    padding: 2px 12px;
+    white-space: nowrap;
+  }
+
+  /* Iframe sub-node */
+  .node-iframe {
+    border-style: dashed;
+    border-color: rgba(242, 139, 158, 0.25);
+  }
+
+  /* ── Architecture Decisions ── */
+  .decisions {
+    display: grid;
+    gap: 1px;
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background 0.2s ease;
+  }
+
+  .decision:last-child { border-bottom: none; }
+
+  .decision:hover { background: rgba(255, 255, 255, 0.01); }
+
+  .decision-num {
+    padding: 24px 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 26px;
+  }
+
+  .decision-content {
+    padding: 24px 0 24px 16px;
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .decision-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .decision-title .highlight {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 400;
+  }
+
+  .hl-blue { background: rgba(139, 192, 255, 0.1); color: var(--accent-blue); }
+  .hl-cyan { background: rgba(110, 236, 216, 0.1); color: var(--accent-cyan); }
+  .hl-amber { background: rgba(245, 197, 98, 0.1); color: var(--accent-amber); }
+  .hl-rose { background: rgba(242, 139, 158, 0.1); color: var(--accent-rose); }
+  .hl-violet { background: rgba(180, 154, 255, 0.1); color: var(--accent-violet); }
+
+  .decision-desc {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  /* ── DB Schema ── */
+  .schema-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .schema-pill {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 300;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .schema-pill:hover {
+    border-color: var(--border-accent);
+    color: var(--accent-cyan);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 80px;
+    padding-top: 40px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-left {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+  }
+
+  .footer-right {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .header { animation: fadeUp 0.8s ease both; }
+  .section:nth-child(2) { animation: fadeUp 0.8s ease 0.1s both; }
+  .section:nth-child(3) { animation: fadeUp 0.8s ease 0.2s both; }
+  .section:nth-child(4) { animation: fadeUp 0.8s ease 0.3s both; }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .page { padding: 48px 20px 80px; }
+    .stack-row { grid-template-columns: 1fr; }
+    .stack-row .layer { border-right: none; border-bottom: 1px solid var(--border-subtle); padding: 12px 20px; }
+    .stack-row .tech { padding: 14px 20px; }
+    .tier-inner { flex-direction: column; }
+    .node { min-width: auto; }
+    .tier-box { padding: 20px; }
+    .decision { grid-template-columns: 36px 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <span class="label">System Architecture</span>
+    <h1>Chat<em>Bridge</em></h1>
+    <p>AI chat platform with sandboxed third-party app integration, built for TutorMeAI. K-12 education, 200K daily active users.</p>
+  </header>
+
+  <!-- Tech Stack -->
+  <section class="section">
+    <div class="section-label">01 &mdash; Stack</div>
+    <h2>Tech Stack</h2>
+    <div class="stack-grid">
+      <div class="stack-row">
+        <div class="layer">Frontend</div>
+        <div class="tech">
+          <span class="tag">Next.js 16</span>
+          <span class="tag">React 19</span>
+          <span class="tag">Tailwind CSS</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Backend</div>
+        <div class="tech">
+          <span class="tag">Node.js</span>
+          <span class="tag">Custom Server (tsx)</span>
+          <span class="tag">API Routes</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Real-time</div>
+        <div class="tech">
+          <span class="tag">WebSockets (ws)</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Database</div>
+        <div class="tech">
+          <span class="tag">PostgreSQL</span>
+          <span class="tag">Drizzle ORM</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">AI</div>
+        <div class="tech">
+          <span class="tag">OpenAI API</span>
+          <span class="tag">Function Calling</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Auth</div>
+        <div class="tech">
+          <span class="tag">JWT</span>
+          <span class="tag">bcryptjs</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Validation</div>
+        <div class="tech">
+          <span class="tag">Zod</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Tooling</div>
+        <div class="tech">
+          <span class="tag">Biome</span>
+          <span class="tag">Vitest</span>
+          <span class="tag">pnpm</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="layer">Deploy</div>
+        <div class="tech">
+          <span class="tag">Railway</span>
+          <span class="tag">Docker</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Diagram -->
+  <section class="section">
+    <div class="section-label">02 &mdash; Topology</div>
+    <h2>System Design</h2>
+    <div class="diagram-container">
+      <div class="diagram">
+
+        <!-- Client Tier -->
+        <div class="diagram-tier tier-client">
+          <div class="tier-header">Client</div>
+          <div class="tier-box">
+            <div class="tier-inner">
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-blue"></span> React UI</div>
+                <div class="node-desc">Next.js App Router. Chat window, message list, streaming display, auth forms.</div>
+              </div>
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-violet"></span> WebSocket Client</div>
+                <div class="node-desc">Persistent connection to server for real-time message streaming and events.</div>
+              </div>
+              <div class="node node-iframe">
+                <div class="node-name"><span class="node-dot dot-rose"></span> Sandboxed iframe</div>
+                <div class="node-desc">Third-party app UI. allow-scripts allow-forms only. JSON-RPC 2.0 via postMessage.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div class="connector">
+          <div class="connector-line"></div>
+          <span class="connector-label">HTTP / WebSocket / SSE</span>
+        </div>
+
+        <!-- Server Tier -->
+        <div class="diagram-tier tier-server">
+          <div class="tier-header">Custom Node Server</div>
+          <div class="tier-box">
+            <div class="tier-inner">
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-amber"></span> Auth</div>
+                <div class="node-desc">JWT tokens, bcrypt hashing. Middleware validates every request and WS upgrade.</div>
+              </div>
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-amber"></span> Chat Service</div>
+                <div class="node-desc">Orchestrates conversation flow. Manages message history and context window compaction.</div>
+              </div>
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-amber"></span> LLM (OpenAI)</div>
+                <div class="node-desc">Server-side only. Function calling with tool schemas. Tiered model routing. Max 2 retries.</div>
+              </div>
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-amber"></span> Tool Router</div>
+                <div class="node-desc">Namespaced tools: {appSlug}__{toolName}. Full lifecycle state machine. Circuit breaker.</div>
+              </div>
+              <div class="node">
+                <div class="node-name"><span class="node-dot dot-amber"></span> Intent Tracker</div>
+                <div class="node-desc">One active intent per conversation. Routes between general_chat and app_intent states.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div class="connector">
+          <div class="connector-line"></div>
+          <span class="connector-label">Drizzle ORM / SQL</span>
+        </div>
+
+        <!-- Database Tier -->
+        <div class="diagram-tier tier-db">
+          <div class="tier-header">Data Layer</div>
+          <div class="tier-box">
+            <div class="tier-inner" style="flex-direction: column; gap: 16px;">
+              <div class="node" style="flex: none;">
+                <div class="node-name"><span class="node-dot dot-cyan"></span> PostgreSQL</div>
+                <div class="node-desc">Managed on Railway. All state persisted. Parameterized queries only.</div>
+              </div>
+              <div class="schema-pills">
+                <span class="schema-pill">users</span>
+                <span class="schema-pill">conversations</span>
+                <span class="schema-pill">messages</span>
+                <span class="schema-pill">apps</span>
+                <span class="schema-pill">app_sessions</span>
+                <span class="schema-pill">tool_logs</span>
+                <span class="schema-pill">intents</span>
+                <span class="schema-pill">oauth_tokens</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Decisions -->
+  <section class="section">
+    <div class="section-label">03 &mdash; Decisions</div>
+    <h2>Key Architecture Decisions</h2>
+    <div class="decisions">
+
+      <div class="decision">
+        <div class="decision-num">01</div>
+        <div class="decision-content">
+          <div class="decision-title">Server-side LLM only <span class="highlight hl-blue">security</span></div>
+          <div class="decision-desc">Client never talks to OpenAI directly. All LLM interaction happens on the server, keeping API keys secure and controlling cost.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">02</div>
+        <div class="decision-content">
+          <div class="decision-title">Three-layer state <span class="highlight hl-violet">architecture</span></div>
+          <div class="decision-desc">Chat state lives in the database, app state lives in the iframe, and a contextual bridge links them through compact summaries.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">03</div>
+        <div class="decision-content">
+          <div class="decision-title">Sandboxed iframes <span class="highlight hl-rose">isolation</span></div>
+          <div class="decision-desc">Third-party apps run in iframes with <code>allow-scripts allow-forms</code> only. No <code>allow-same-origin</code>. Communication via JSON-RPC 2.0 over postMessage with origin validation.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">04</div>
+        <div class="decision-content">
+          <div class="decision-title">Namespaced tool router <span class="highlight hl-amber">extensibility</span></div>
+          <div class="decision-desc">Tools are namespaced as <code>{appSlug}__{toolName}</code>. The router owns the full invocation lifecycle: IDLE &rarr; TOOL_REQUESTED &rarr; APP_RENDERED &rarr; ACTIVE &rarr; COMPLETED.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">05</div>
+        <div class="decision-content">
+          <div class="decision-title">Single active app <span class="highlight hl-cyan">simplicity</span></div>
+          <div class="decision-desc">One app session at a time per conversation. Starting a new app terminates the previous session. No concurrent app complexity.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">06</div>
+        <div class="decision-content">
+          <div class="decision-title">Intent tracking <span class="highlight hl-violet">context</span></div>
+          <div class="decision-desc">Each conversation has one active intent &mdash; either <code>general_chat</code> or <code>app_intent</code>. Determines which tool schemas are injected into LLM context.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">07</div>
+        <div class="decision-content">
+          <div class="decision-title">Circuit breaker <span class="highlight hl-rose">resilience</span></div>
+          <div class="decision-desc">3 consecutive tool failures opens the breaker. Half-open after 30 seconds. Prevents cascading failures from misbehaving apps.</div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="decision-num">08</div>
+        <div class="decision-content">
+          <div class="decision-title">Context window management <span class="highlight hl-amber">efficiency</span></div>
+          <div class="decision-desc">Completed app interactions are replaced with <code>context_summary</code>, not raw JSON. Compaction triggers at 80% capacity. Last 10 messages always retained.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-left">ChatBridge v1.0 &mdash; TutorMeAI</div>
+    <div class="footer-right">Next.js &middot; PostgreSQL &middot; OpenAI &middot; Railway</div>
+  </footer>
+
+</div>
+</body>
+</html>
