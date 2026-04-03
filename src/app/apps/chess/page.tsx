@@ -1,5 +1,6 @@
 'use client';
 
+import { Chess } from 'chess.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PIECE_UNICODE: Record<string, string> = {
@@ -19,8 +20,10 @@ const PIECE_UNICODE: Record<string, string> = {
 
 const LIGHT = '#f0d9b5';
 const DARK = '#b58863';
-const SELECTED_LIGHT = '#829769';
-const SELECTED_DARK = '#646d40';
+const HIGHLIGHT = '#829769';
+const HIGHLIGHT_DARK = '#646d40';
+const LAST_MOVE_LIGHT = '#cdd26a';
+const LAST_MOVE_DARK = '#aaa23a';
 
 function fenToBoard(fen: string): (string | null)[][] {
   const rows = fen.split(' ')[0].split('/');
@@ -37,32 +40,115 @@ function fenToBoard(fen: string): (string | null)[][] {
   });
 }
 
-function squareToAlgebraic(row: number, col: number, flipped: boolean): string {
+function toSquare(row: number, col: number, flipped: boolean): string {
   const r = flipped ? row : 7 - row;
   const c = flipped ? 7 - col : col;
   return `${'abcdefgh'[c]}${r + 1}`;
 }
 
 export default function ChessApp() {
-  const [fen, setFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-  const [playerColor, setPlayerColor] = useState<'white' | 'black'>('white');
+  const gameRef = useRef(new Chess());
+  const [fen, setFen] = useState(gameRef.current.fen());
+  const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
   const [selected, setSelected] = useState<string | null>(null);
-  const [status, setStatus] = useState('Waiting to start...');
-  const [moveHistory, setMoveHistory] = useState<string[]>([]);
+  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+  const [status, setStatus] = useState('Click a piece to start playing');
   const [gameOver, setGameOver] = useState(false);
-  const _readyRef = useRef(false);
 
-  const flipped = playerColor === 'black';
+  const flipped = playerColor === 'b';
   const board = fenToBoard(fen);
 
-  // postMessage communication with parent
   const sendToParent = useCallback((msg: Record<string, unknown>) => {
     if (window.parent !== window) {
       window.parent.postMessage(JSON.stringify(msg), '*');
     }
   }, []);
 
-  // Handle incoming messages from platform
+  const updateStatus = useCallback(() => {
+    const game = gameRef.current;
+    if (game.isCheckmate()) {
+      const winner = game.turn() === 'w' ? 'Black' : 'White';
+      setStatus(`Checkmate! ${winner} wins.`);
+      setGameOver(true);
+      sendToParent({
+        jsonrpc: '2.0',
+        method: 'app_complete',
+        params: {
+          summary: `Checkmate. ${winner} wins in ${Math.ceil(game.moveNumber())} moves.`,
+          data: { result: 'checkmate', winner: winner.toLowerCase(), moves: game.moveNumber() },
+        },
+      });
+    } else if (game.isDraw()) {
+      setStatus('Draw!');
+      setGameOver(true);
+      sendToParent({
+        jsonrpc: '2.0',
+        method: 'app_complete',
+        params: { summary: 'Game drawn.', data: { result: 'draw', moves: game.moveNumber() } },
+      });
+    } else if (game.isCheck()) {
+      setStatus(`Check! ${game.turn() === 'w' ? 'White' : 'Black'} to move.`);
+    } else {
+      setStatus(`${game.turn() === 'w' ? 'White' : 'Black'} to move.`);
+    }
+  }, [sendToParent]);
+
+  const tryMove = useCallback(
+    (from: string, to: string) => {
+      const game = gameRef.current;
+      try {
+        const move = game.move({ from, to, promotion: 'q' });
+        if (move) {
+          setFen(game.fen());
+          setLastMove({ from, to });
+          setSelected(null);
+          updateStatus();
+          sendToParent({
+            jsonrpc: '2.0',
+            method: 'app_state_update',
+            params: {
+              summary: `Move: ${move.san}`,
+              board_fen: game.fen(),
+              last_move: move.san,
+            },
+          });
+          return true;
+        }
+      } catch {
+        // Invalid move
+      }
+      return false;
+    },
+    [updateStatus, sendToParent]
+  );
+
+  const handleSquareClick = useCallback(
+    (row: number, col: number) => {
+      if (gameOver) return;
+      const sq = toSquare(row, col, flipped);
+      const game = gameRef.current;
+      const piece = game.get(sq as Parameters<typeof game.get>[0]);
+
+      if (selected) {
+        // Try to move
+        if (tryMove(selected, sq)) return;
+        // If invalid move but clicked own piece, re-select
+        if (piece && piece.color === game.turn()) {
+          setSelected(sq);
+          return;
+        }
+        setSelected(null);
+      } else {
+        // Select a piece (only own color on own turn)
+        if (piece && piece.color === game.turn()) {
+          setSelected(sq);
+        }
+      }
+    },
+    [selected, gameOver, flipped, tryMove]
+  );
+
+  // Handle postMessage from parent (tool invocations)
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       let data: Record<string, unknown>;
@@ -72,133 +158,57 @@ export default function ChessApp() {
         return;
       }
 
-      if (data.method === 'tool_invoke' && data.params) {
-        const params = data.params as { tool: string; arguments: Record<string, unknown>; invocationId: string };
+      if (data.method === 'tool_invoke') {
+        const params = data.params as { tool: string; arguments: Record<string, unknown> };
         const id = data.id as number;
 
-        // Handle different tools
-        switch (params.tool) {
-          case 'start_game': {
-            const color = (params.arguments?.color as string) || 'white';
-            setPlayerColor(color === 'black' ? 'black' : 'white');
-            setFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
-            setStatus(`Game started! You are playing ${color}.`);
-            setMoveHistory([]);
-            setGameOver(false);
-            sendToParent({
-              jsonrpc: '2.0',
-              result: {
-                board_fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-                player_color: color,
-                status: 'in_progress',
-              },
-              id,
-            });
-            break;
-          }
-          case 'make_move': {
-            // Move result comes from server — update the board
-            // The server handles validation, so we just accept the result
-            break;
-          }
-          case 'get_board_state': {
-            sendToParent({
-              jsonrpc: '2.0',
-              result: {
-                board_fen: fen,
-                move_history: moveHistory,
-                current_turn: fen.split(' ')[1] === 'w' ? 'white' : 'black',
-              },
-              id,
-            });
-            break;
-          }
-          case 'resign': {
-            setGameOver(true);
-            setStatus('You resigned.');
-            sendToParent({
-              jsonrpc: '2.0',
-              result: { result: 'resigned' },
-              id,
-            });
-            sendToParent({
-              jsonrpc: '2.0',
-              method: 'app_complete',
-              params: { summary: 'Player resigned.', data: { result: 'resigned' } },
-            });
-            break;
-          }
-        }
-      }
-
-      // Handle move results from server (forwarded via platform)
-      if (data.jsonrpc === '2.0' && data.result && typeof data.result === 'object') {
-        const result = data.result as Record<string, unknown>;
-        if (result.board_fen) {
-          setFen(result.board_fen as string);
-          if (result.last_move) {
-            setMoveHistory((prev) => [...prev, result.last_move as string]);
-          }
-          if (result.game_over) {
-            setGameOver(true);
-            setStatus(`Game over: ${result.result}`);
-            sendToParent({
-              jsonrpc: '2.0',
-              method: 'app_complete',
-              params: {
-                summary: `Game ended: ${result.result}`,
-                data: { result: result.result, moves: moveHistory.length + 1 },
-              },
-            });
-          }
+        if (params.tool === 'start_game') {
+          const color = (params.arguments?.color as string)?.[0] || 'w';
+          gameRef.current = new Chess();
+          setPlayerColor(color === 'b' ? 'b' : 'w');
+          setFen(gameRef.current.fen());
+          setSelected(null);
+          setLastMove(null);
+          setGameOver(false);
+          setStatus(`Game started! You are ${color === 'b' ? 'Black' : 'White'}.`);
+          sendToParent({
+            jsonrpc: '2.0',
+            result: {
+              board_fen: gameRef.current.fen(),
+              player_color: color === 'b' ? 'black' : 'white',
+              status: 'in_progress',
+            },
+            id,
+          });
+        } else if (params.tool === 'get_board_state') {
+          const game = gameRef.current;
+          sendToParent({
+            jsonrpc: '2.0',
+            result: {
+              board_fen: game.fen(),
+              move_history: game.history(),
+              current_turn: game.turn() === 'w' ? 'white' : 'black',
+            },
+            id,
+          });
         }
       }
     };
-
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [fen, moveHistory, sendToParent]);
+  }, [sendToParent]);
 
-  // Signal iframe_ready — retry every 500ms until parent acknowledges
+  // Signal iframe_ready — retry until acknowledged
   useEffect(() => {
     const signal = () => sendToParent({ jsonrpc: '2.0', method: 'iframe_ready', params: {} });
     signal();
     const interval = setInterval(signal, 500);
-    // Stop after 15s
     const timeout = setTimeout(() => clearInterval(interval), 15000);
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
   }, [sendToParent]);
-
-  const handleSquareClick = useCallback(
-    (row: number, col: number) => {
-      if (gameOver) return;
-      const sq = squareToAlgebraic(row, col, flipped);
-
-      if (selected) {
-        // Attempt move: selected → sq
-        const move = `${selected}${sq}`;
-        setStatus(`Moving ${move}...`);
-        setSelected(null);
-
-        // Tell parent about the move attempt (parent routes to server)
-        sendToParent({
-          jsonrpc: '2.0',
-          method: 'app_state_update',
-          params: { summary: `Player attempts move: ${move}`, move },
-        });
-      } else {
-        // Select a piece
-        const piece = board[row][col];
-        if (piece) {
-          setSelected(sq);
-        }
-      }
-    },
-    [selected, gameOver, flipped, board, sendToParent]
-  );
 
   const displayBoard = flipped ? [...board].reverse().map((row) => [...row].reverse()) : board;
 
@@ -214,14 +224,13 @@ export default function ChessApp() {
         minHeight: '100vh',
       }}
     >
-      <div style={{ marginBottom: '12px', fontSize: '14px', color: '#555', textAlign: 'center' }}>{status}</div>
+      <div style={{ marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: '#333' }}>{status}</div>
 
-      {/* Board */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(8, 48px)',
-          gridTemplateRows: 'repeat(8, 48px)',
+          gridTemplateColumns: 'repeat(8, 52px)',
+          gridTemplateRows: 'repeat(8, 52px)',
           border: '2px solid #333',
           borderRadius: '4px',
           overflow: 'hidden',
@@ -231,10 +240,15 @@ export default function ChessApp() {
           row.map((piece, ci) => {
             const actualRow = flipped ? 7 - ri : ri;
             const actualCol = flipped ? 7 - ci : ci;
-            const sq = squareToAlgebraic(actualRow, actualCol, flipped);
+            const sq = toSquare(actualRow, actualCol, flipped);
             const isLight = (actualRow + actualCol) % 2 === 0;
             const isSelected = selected === sq;
-            const bg = isSelected ? (isLight ? SELECTED_LIGHT : SELECTED_DARK) : isLight ? LIGHT : DARK;
+            const isLastMove = lastMove && (sq === lastMove.from || sq === lastMove.to);
+
+            let bg: string;
+            if (isSelected) bg = isLight ? HIGHLIGHT : HIGHLIGHT_DARK;
+            else if (isLastMove) bg = isLight ? LAST_MOVE_LIGHT : LAST_MOVE_DARK;
+            else bg = isLight ? LIGHT : DARK;
 
             return (
               <button
@@ -242,15 +256,15 @@ export default function ChessApp() {
                 key={sq}
                 onClick={() => handleSquareClick(actualRow, actualCol)}
                 style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '52px',
+                  height: '52px',
                   backgroundColor: bg,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: 'none',
                   padding: 0,
-                  fontSize: '32px',
+                  fontSize: '36px',
                   cursor: gameOver ? 'default' : 'pointer',
                   userSelect: 'none',
                   lineHeight: 1,
@@ -263,14 +277,10 @@ export default function ChessApp() {
         )}
       </div>
 
-      {/* Move history */}
-      {moveHistory.length > 0 && (
-        <div style={{ marginTop: '12px', fontSize: '12px', color: '#888', maxWidth: '384px', textAlign: 'center' }}>
-          Moves: {moveHistory.join(', ')}
-        </div>
-      )}
+      <div style={{ marginTop: '8px', fontSize: '11px', color: '#999' }}>
+        Move {gameRef.current.moveNumber()} &middot; {gameRef.current.history().length} moves played
+      </div>
 
-      {/* Resign button */}
       {!gameOver && (
         <button
           type="button"
@@ -284,7 +294,7 @@ export default function ChessApp() {
             });
           }}
           style={{
-            marginTop: '12px',
+            marginTop: '8px',
             padding: '6px 16px',
             fontSize: '12px',
             color: '#dc2626',

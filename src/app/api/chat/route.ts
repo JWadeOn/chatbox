@@ -151,22 +151,11 @@ You have access to tools from registered apps. Use them when the user's request 
             retries++;
           }
 
-          // Stream the final text response
+          // Send the final text response
           const finalContent = response.choices[0]?.message?.content || '';
           if (finalContent) {
-            // Stream it in chunks for a natural feel
-            const words = finalContent.split(' ');
-            let sent = '';
-            for (let i = 0; i < words.length; i++) {
-              const chunk = (i === 0 ? '' : ' ') + words[i];
-              sent += chunk;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`));
-              // Small delay for streaming effect
-              await new Promise((r) => setTimeout(r, 15));
-            }
-
-            // Persist assistant message
-            await conversationService.addMessage(conversationId, 'assistant', sent.trim());
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: finalContent })}\n\n`));
+            await conversationService.addMessage(conversationId, 'assistant', finalContent);
           }
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
