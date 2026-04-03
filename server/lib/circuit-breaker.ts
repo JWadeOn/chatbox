@@ -3,15 +3,20 @@ export class CircuitBreaker {
   private state: 'closed' | 'open' | 'half-open' = 'closed';
   private openedAt = 0;
 
-  private static readonly FAILURE_THRESHOLD = 3;
-  private static readonly OPEN_DURATION_MS = 30_000;
+  private readonly failureThreshold: number;
+  private readonly openDurationMs: number;
+
+  constructor(failureThreshold = 3, openDurationMs = 30_000) {
+    this.failureThreshold = failureThreshold;
+    this.openDurationMs = openDurationMs;
+  }
 
   isOpen(): boolean {
     if (this.state === 'closed') return false;
 
     if (this.state === 'open') {
       const elapsed = Date.now() - this.openedAt;
-      if (elapsed >= CircuitBreaker.OPEN_DURATION_MS) {
+      if (elapsed >= this.openDurationMs) {
         this.state = 'half-open';
         return false;
       }
@@ -24,7 +29,7 @@ export class CircuitBreaker {
 
   recordFailure(): void {
     this.failures++;
-    if (this.failures >= CircuitBreaker.FAILURE_THRESHOLD) {
+    if (this.failures >= this.failureThreshold) {
       this.state = 'open';
       this.openedAt = Date.now();
     }
