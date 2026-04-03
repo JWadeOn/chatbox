@@ -124,8 +124,7 @@ T20 → T21
 
 PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
-- [ ] T04: WebSocket chat + LLM streaming (L) [WS-A] ← T03 (done)
-- [ ] T07: Tool discovery (M) [WS-B] ← T06 (done)
+- [ ] T11: Iframe rendering + postMessage (L) [WS-C] ← T04 (done)
 
 ---
 
@@ -161,8 +160,8 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 
 > Chat goes live. Tool discovery becomes available.
 
-- [ ] T04: WebSocket chat + LLM streaming — WS /api/chat with auth, stream_start/stream_chunk/stream_end protocol, message persistence, conversation history as LLM context (L) [WS-A] ← T03
-- [ ] T07: Tool discovery — GET /api/tools returns flat list from all active apps, appSlug__toolName namespacing, OpenAI function definition format, inactive apps excluded (M) [WS-B] ← T06
+- [x] T04: WebSocket chat + LLM streaming — WS /api/chat with auth, stream_start/stream_chunk/stream_end protocol, message persistence, conversation history as LLM context (L) [WS-A] ← T03 — done 2026-04-02
+- [x] T07: Tool discovery — GET /api/tools returns flat list from all active apps, appSlug__toolName namespacing, OpenAI function definition format, inactive apps excluded (M) [WS-B] ← T06 — done 2026-04-02
 
 ## Layer 5 — Client Integration (deadline: Early Fri)
 
@@ -247,6 +246,8 @@ PARALLEL OPPORTUNITY: 2 tasks ready, independent workstreams.
 - [x] T10: Intent service (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T07+T08).
 - [x] T03: Conversation CRUD (M) [WS-A] — done 2026-04-02. Unblocked: T04.
 - [x] T06: App registration (M) [WS-B] — done 2026-04-02. Unblocked: T07.
+- [x] T04: WebSocket chat + LLM streaming (L) [WS-A] — done 2026-04-02. Unblocked: T11.
+- [x] T07: Tool discovery (M) [WS-B] — done 2026-04-02. Unblocked: T09 (partial, needs T08+T10 — already done).
 
 ---
 
