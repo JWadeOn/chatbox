@@ -2,7 +2,7 @@
 
 ## Project
 
-ChatBridge is an AI chat platform with sandboxed third-party app integration, built for TutorMeAI (K-12, 200K DAU). Pre-scaffold stage -- greenfield Next.js project with a read-only reference codebase.
+ChatBridge is an AI chat platform with sandboxed third-party app integration, built for TutorMeAI (K-12, 200K DAU). Built as a brownfield extension on top of the forked Chatbox codebase -- proving we can work with and extend an existing project.
 
 ## Stack
 
@@ -40,7 +40,7 @@ chatbridge/
 │   ├── middleware/              # auth (JWT), validation
 │   └── lib/                    # db, llm, circuit-breaker, invocation-state, schema-sanitizer, logger, ws-manager
 ├── __tests__/                  # Mirrors src/ and server/ structure
-├── chatbox/                    # READ-ONLY reference codebase (do not modify)
+├── chatbox/                    # Forked Chatbox codebase -- the foundation we build on top of
 ├── docs/                       # PRD, SPEC, RECONCILIATION, CONVENTIONS, ADRs
 └── CLAUDE.md
 ```
@@ -115,15 +115,15 @@ chatbridge/
 - Optional env vars: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `WEATHER_API_KEY`, `PORT`
 - Never commit secrets. Use `.env.local` (gitignored).
 
-## Reference Codebase
+## Chatbox Foundation
 
-The `chatbox/` directory contains the forked Chatbox codebase. Consult it for:
+The `chatbox/` directory contains the forked Chatbox codebase that ChatBridge is built on top of. Key areas:
 - Markdown rendering component design (`src/renderer/components/`)
 - Context management algorithms (`src/renderer/packages/context-management/`)
 - Token estimation utilities (`src/renderer/packages/`)
 - General React chat UI patterns
 
-Do NOT import from or depend on `chatbox/` code directly. Copy and adapt if needed.
+This is a brownfield project -- the goal is to demonstrate building on an existing codebase. Chatbox-derived modules live in `src/lib/extracted/chatbox/` and `src/components/chatbox/` as owned, adapted code.
 
 ## Do NOT
 
@@ -131,8 +131,7 @@ Do NOT import from or depend on `chatbox/` code directly. Copy and adapt if need
 - Make client-side LLM calls -- all LLM interaction is server-side
 - Use `console.log` in production code
 - Build a second app before chess works end-to-end (vertical slice rule)
-- Modify anything in `chatbox/` -- it is a read-only reference
-- Import from `chatbox/` directly -- copy and adapt instead
+- Break the Chatbox foundation -- ChatBridge extends it, doesn't replace it
 - Commit secrets, tokens, or API keys
 - Use SQL string interpolation -- parameterized queries only
 - Develop apps horizontally -- get one app fully working before touching the next

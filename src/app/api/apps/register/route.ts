@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { AppError, appService } from '../../../../../server/services/app.service';
+import { toolService } from '../../../../../server/services/tool.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest) {
       toolSchemas: toolSchemas ?? [],
       oauthConfig,
     });
+
+    // Invalidate tool cache so new tools are discovered immediately
+    toolService.invalidateCache();
 
     return NextResponse.json({ app }, { status: 201 });
   } catch (error) {

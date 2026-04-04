@@ -26,8 +26,17 @@ type ToolSchema = {
   parameters: Record<string, unknown>;
 };
 
+const TOOL_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+
 export class ToolService {
+  private cachedTools: DiscoveredTool[] | null = null;
+  private cacheExpiry = 0;
+
   async discoverTools(): Promise<DiscoveredTool[]> {
+    if (this.cachedTools && Date.now() < this.cacheExpiry) {
+      return this.cachedTools;
+    }
+
     const activeApps = await db.select().from(apps).where(eq(apps.status, 'active'));
 
     const tools: DiscoveredTool[] = [];
@@ -46,7 +55,15 @@ export class ToolService {
       }
     }
 
+    this.cachedTools = tools;
+    this.cacheExpiry = Date.now() + TOOL_CACHE_TTL_MS;
     return tools;
+  }
+
+  /** Invalidate the tool cache (call after app registration/update). */
+  invalidateCache(): void {
+    this.cachedTools = null;
+    this.cacheExpiry = 0;
   }
 
   formatForLLM(tools: DiscoveredTool[]): OpenAIFunctionDef[] {

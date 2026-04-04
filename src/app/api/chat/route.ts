@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { ChessToolHandler } from '../../../../server/apps/chess';
 import { SpotifyToolHandler } from '../../../../server/apps/spotify';
 import { WeatherToolHandler } from '../../../../server/apps/weather';
+import { toolRateLimiter } from '../../../../server/lib/rate-limiter';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
 import { completionService } from '../../../../server/services/completion.service';
 import { conversationService } from '../../../../server/services/conversation.service';
@@ -28,7 +29,10 @@ const APP_RENDER_TRIGGERS: Record<string, string[]> = {
   spotify: ['create_playlist'],
 };
 
-/** Execute the actual tool handler (app-specific logic). */
+const TOOL_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Execute the actual tool handler with a 15s timeout. */
 async function executeToolHandler(
   appSlug: string,
   toolName: string,
@@ -37,16 +41,24 @@ async function executeToolHandler(
   userId: string,
   conversationId: string
 ): Promise<unknown> {
-  switch (appSlug) {
-    case 'chess':
-      return chessHandler.handleToolInvoke(sessionId, toolName, args);
-    case 'weather':
-      return weatherHandler.handleToolInvoke(toolName, args);
-    case 'spotify':
-      return spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
-    default:
-      return { error: `No handler for app: ${appSlug}` };
-  }
+  const handler = (() => {
+    switch (appSlug) {
+      case 'chess':
+        return chessHandler.handleToolInvoke(sessionId, toolName, args);
+      case 'weather':
+        return weatherHandler.handleToolInvoke(toolName, args);
+      case 'spotify':
+        return spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
+      default:
+        return Promise.resolve({ error: `No handler for app: ${appSlug}` });
+    }
+  })();
+
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Tool ${appSlug}__${toolName} timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
+  );
+
+  return Promise.race([handler, timeout]);
 }
 
 /**
@@ -103,20 +115,28 @@ export async function POST(request: NextRequest) {
     // Build mid-app assistance: inject active app state
     const activeAppContext = getActiveAppContext(conversationId);
 
-    const systemPrompt = `You are a helpful educational assistant on the TutorMeAI platform.
+    const systemPrompt = `You are an educational assistant on the TutorMeAI platform, helping K-12 students learn through interactive tools and conversation.
 
-## Available Tools
-You have access to tools from registered apps. Use them when the user's request clearly matches a tool's purpose.
+## Your Role
+You help students learn by combining conversation with hands-on learning tools. When a student can benefit from an interactive experience, guide them to the right tool. When they finish, help them reflect on what they learned.
+
+## Available Learning Tools
+
+### Chess (Strategic Thinking)
+A chess tutor that builds problem-solving, pattern recognition, and planning skills. Use chess__start_game to begin a game, chess__make_move to play moves, chess__get_board_state to analyze the position. During games, coach the student — explain tactical ideas, point out patterns, and help them think through consequences of moves.
+
+### Weather (Geography & Earth Science)
+A geography and earth science exploration tool. Use weather__get_weather with a location to help students learn about climate zones, hemispheric seasons, the water cycle, and global geography. Contextualize the data — compare weather across regions, explain why temperatures differ, connect to science concepts.
+
+### Spotify (Focus & Study Skills)
+A study playlist creator that supports focused learning. First check auth with spotify__get_auth_status, then use spotify__create_playlist with name, mood, and optional track_count. Help students understand how music and environment affect concentration. If authentication is needed, provide the auth URL from the tool result.
 
 ## Rules
-- Only invoke tools when the user's request clearly matches a tool's purpose.
+- Only invoke tools when the student's request clearly matches a tool's purpose.
 - If a request is ambiguous between multiple tools, ask for clarification.
-- Never invoke tools for unrelated queries.
-- After a tool returns results, summarize them naturally for the user.
-- For chess: use the chess__start_game tool to begin, chess__make_move to play moves, chess__get_board_state to analyze.
-- For weather: use weather__get_weather with a location parameter.
-- For spotify: first check auth with spotify__get_auth_status, then use spotify__create_playlist with name, mood, and optional track_count.
-- If a Spotify action requires authentication, tell the user they need to connect their Spotify account first and provide the auth URL from the tool result.${appSummaryContext ? `\n\n${appSummaryContext}` : ''}${activeAppContext}`;
+- Never invoke tools for unrelated queries — respond conversationally instead.
+- After a tool returns results, connect them back to what the student is learning.
+- Frame interactions as learning opportunities, not just feature demonstrations.${appSummaryContext ? `\n\n${appSummaryContext}` : ''}${activeAppContext}`;
 
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemPrompt },
@@ -127,6 +147,12 @@ You have access to tools from registered apps. Use them when the user's request 
     ];
 
     const encoder = new TextEncoder();
+
+    // 60s request-level timeout — prevents indefinite connection holding
+    const requestTimeout = setTimeout(() => {
+      // Signal handled in the stream's catch block
+    }, REQUEST_TIMEOUT_MS);
+    const requestDeadline = Date.now() + REQUEST_TIMEOUT_MS;
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -142,7 +168,7 @@ You have access to tools from registered apps. Use them when the user's request 
           const MAX_RETRIES = 2;
 
           // Tool call loop — handle function calls until the LLM gives a text response
-          while (response.choices[0]?.message?.tool_calls && retries < MAX_RETRIES) {
+          while (response.choices[0]?.message?.tool_calls && retries < MAX_RETRIES && Date.now() < requestDeadline) {
             const toolCalls = response.choices[0].message.tool_calls;
 
             // Add assistant message with tool calls to context
@@ -154,6 +180,24 @@ You have access to tools from registered apps. Use them when the user's request 
 
               const [appSlug, toolName] = tc.function.name.split('__');
               const args = JSON.parse(tc.function.arguments || '{}');
+
+              // 0. Rate limit check (10 tool invocations/min/user)
+              const rateCheck = toolRateLimiter.check(userId);
+              if (!rateCheck.allowed) {
+                const retryAfter = Math.ceil(rateCheck.retryAfterMs / 1000);
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result: { error: `Rate limit exceeded. Try again in ${retryAfter}s.` } })}\n\n`
+                  )
+                );
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: tc.id,
+                  content: JSON.stringify({ error: `Rate limit exceeded. Try again in ${retryAfter} seconds.` }),
+                });
+                continue;
+              }
+              toolRateLimiter.record(userId);
 
               // 1. Route through toolRouter for session management, logging, circuit breaker
               const routeResult = await toolRouter.invoke({
@@ -182,11 +226,20 @@ You have access to tools from registered apps. Use them when the user's request 
               const invocationId = routeResult.invocationId;
               const sessionId = routeResult.sessionId ?? '';
 
-              // 2. Execute the actual tool handler
-              const result = await executeToolHandler(appSlug, toolName, args, sessionId, userId, conversationId);
+              // 2. Execute the actual tool handler (with 15s timeout)
+              let result: unknown;
+              try {
+                result = await executeToolHandler(appSlug, toolName, args, sessionId, userId, conversationId);
+              } catch (toolErr) {
+                const errMsg = toolErr instanceof Error ? toolErr.message : 'Tool execution failed';
+                result = { error: errMsg };
+                if (invocationId) {
+                  await toolRouter.handleTimeout(invocationId);
+                }
+              }
 
               // 3. Record the result in the tool router (logging, circuit breaker)
-              if (invocationId) {
+              if (invocationId && !(result as Record<string, unknown>)?.error) {
                 await toolRouter.handleResult(invocationId, result);
               }
 
@@ -238,6 +291,7 @@ You have access to tools from registered apps. Use them when the user's request 
           console.error('[chat] Error:', msg);
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
         } finally {
+          clearTimeout(requestTimeout);
           controller.close();
         }
       },

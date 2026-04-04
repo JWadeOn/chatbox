@@ -1,6 +1,9 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { conversations, messages } from '../lib/schema';
+
+const DEFAULT_CONVERSATION_LIMIT = 50;
+const DEFAULT_MESSAGE_LIMIT = 50;
 
 export class ConversationService {
   async create(userId: string, title?: string) {
@@ -11,15 +14,16 @@ export class ConversationService {
     return conversation;
   }
 
-  async list(userId: string) {
+  async list(userId: string, limit = DEFAULT_CONVERSATION_LIMIT) {
     return db
       .select()
       .from(conversations)
       .where(eq(conversations.userId, userId))
-      .orderBy(desc(conversations.updatedAt));
+      .orderBy(desc(conversations.updatedAt))
+      .limit(limit);
   }
 
-  async get(conversationId: string, userId: string) {
+  async get(conversationId: string, userId: string, messageLimit = DEFAULT_MESSAGE_LIMIT) {
     const [conversation] = await db
       .select()
       .from(conversations)
@@ -30,13 +34,15 @@ export class ConversationService {
       return null;
     }
 
+    // Load most recent messages (ordered ascending for LLM context)
     const msgs = await db
       .select()
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
-      .orderBy(messages.createdAt);
+      .orderBy(desc(messages.createdAt))
+      .limit(messageLimit);
 
-    return { ...conversation, messages: msgs };
+    return { ...conversation, messages: msgs.reverse() };
   }
 
   async delete(conversationId: string, userId: string): Promise<boolean> {
@@ -60,20 +66,22 @@ export class ConversationService {
       .values({ conversationId, role, content, metadata: metadata || {} })
       .returning();
 
-    // Auto-title: set title from first user message if untitled
+    // Update timestamp; auto-title first user message if untitled (single UPDATE, no SELECT)
     if (role === 'user') {
-      const [conv] = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
-      if (conv && !conv.title) {
-        const title = content.length > 50 ? `${content.slice(0, 47)}...` : content;
-        await db
-          .update(conversations)
-          .set({ title, updatedAt: new Date() })
-          .where(eq(conversations.id, conversationId));
-      } else {
-        await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
-      }
+      const title = content.length > 50 ? `${content.slice(0, 47)}...` : content;
+      // COALESCE keeps existing title if set; otherwise uses first user message
+      await db
+        .update(conversations)
+        .set({
+          updatedAt: new Date(),
+          title: sql`COALESCE(${conversations.title}, ${title})`,
+        })
+        .where(eq(conversations.id, conversationId));
     } else {
-      await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
+      await db
+        .update(conversations)
+        .set({ updatedAt: new Date() })
+        .where(eq(conversations.id, conversationId));
     }
 
     return message;

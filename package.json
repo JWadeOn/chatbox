@@ -14,7 +14,9 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx server/seed.ts"
+    "db:seed": "tsx server/seed.ts",
+    "build:chatbox": "cd chatbox && pnpm run build:web",
+    "build:all": "pnpm run build:chatbox && pnpm run build"
   },
   "keywords": [],
   "author": "wadeon <jwbprofessional@gmail.com>",

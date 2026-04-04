@@ -36,8 +36,8 @@ The project is meant to build on top of Chatbox. That means:
 
 - reuse or adapt Chatbox interaction patterns first
 - do not redesign the chat shell unless a platform requirement forces it
-- treat the `chatbox/` directory as a donor/reference codebase, not a live runtime dependency
-- extract copied code into ChatBridge-owned modules before relying on it
+- treat the `chatbox/` directory as the foundation codebase that ChatBridge extends
+- extract and adapt Chatbox code into ChatBridge-owned modules as needed
 
 ### 2.2 Server Authority Is Non-Negotiable
 
@@ -129,49 +129,45 @@ The deployable application may be a web-first shell, but it must remain Chatbox-
                     PostgreSQL / durable storage
 ```
 
-### 4.2 Brownfield Interpretation
+### 4.2 Brownfield Interpretation (Option C)
 
-This architecture does **not** mean "ignore Chatbox and rebuild in a new framework." It means:
+ChatBridge uses Chatbox's actual web build as the frontend shell. This means:
 
-- use a deployable web shell where public access and server authority demand it
-- keep Chatbox-derived interaction primitives and extracted modules in that shell
-- replace only the parts Chatbox was never designed to own
+- Chatbox's web build is the deployed frontend — not a separate Next.js UI
+- ChatBridge features are injected INTO Chatbox via a custom provider, auth gate, and app renderer
+- The server control plane (auth, LLM, tools, apps, OAuth) is owned by ChatBridge
+- Chatbox handles UI, state management, message rendering, and chat ergonomics
 
 ---
 
 ## 5. Repo Ownership and Boundaries
 
-Recommended repo contract:
-
 ```text
 chatbridge/
-├── chatbox/                  # read-only donor/reference codebase
-├── src/                      # ChatBridge-owned client app
-│   ├── app/                  # routes/pages if using Next.js App Router
-│   ├── components/
-│   │   ├── chat/             # adapted chat UI
-│   │   ├── apps/             # app renderer / lifecycle UI
-│   │   └── ui/
-│   ├── lib/
-│   │   ├── extracted/        # Chatbox-derived owned modules
-│   │   ├── chat/
-│   │   ├── postmessage/
-│   │   └── api/
-│   └── types/
-├── server/                   # server control plane
-│   ├── routes/
-│   ├── services/
-│   ├── lib/
-│   └── types/
+├── chatbox/                  # Forked Chatbox — the frontend shell (modified)
+│   ├── src/shared/providers/definitions/chatbridge.ts   # ChatBridge provider
+│   ├── src/shared/providers/definitions/models/chatbridge.ts  # Model class
+│   ├── src/renderer/stores/chatbridge/                  # Auth + conversation mapping
+│   ├── src/renderer/components/chatbridge/              # AuthGate + AppRenderer
+│   ├── src/renderer/setup/chatbridge_init.ts            # Startup config
+│   └── (rest of Chatbox — UI, routing, state, etc.)
+├── src/                      # ChatBridge server app (Next.js)
+│   ├── app/api/              # API route handlers
+│   └── app/apps/             # Chess and Spotify app pages (served in iframes)
+├── server/                   # Server control plane
+│   ├── services/             # chat, tool-router, intent, completion, auth, oauth
+│   ├── apps/                 # chess, weather, spotify handlers
+│   ├── lib/                  # db, logger, circuit-breaker, schema, ws-manager
+│   └── middleware/            # auth
 └── docs/
 ```
 
 ### 5.1 Rules
 
-- `chatbox/` stays read-only
-- no runtime imports from `chatbox/`
-- any reused code is copied/extracted into ChatBridge-owned files
-- extracted modules must get focused regression tests
+- `chatbox/` is the forked foundation — ChatBridge builds on top of it
+- New ChatBridge code inside chatbox/ lives in clearly namespaced directories (chatbridge/)
+- The server control plane is fully owned by ChatBridge
+- App pages (chess, spotify) are served by Next.js at /apps/*
 
 ---
 

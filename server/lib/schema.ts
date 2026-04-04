@@ -73,7 +73,10 @@ export const appSessions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('idx_app_sessions_conversation').on(table.conversationId)]
+  (table) => [
+    index('idx_app_sessions_conversation').on(table.conversationId),
+    index('idx_app_sessions_conversation_status').on(table.conversationId, table.status),
+  ]
 );
 
 // 2.5 Tool Invocation Log
@@ -137,5 +140,8 @@ export const intents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   },
-  (table) => [index('idx_intents_conversation').on(table.conversationId, table.createdAt)]
+  (table) => [
+    index('idx_intents_conversation').on(table.conversationId, table.createdAt),
+    index('idx_intents_conversation_status').on(table.conversationId, table.status),
+  ]
 );

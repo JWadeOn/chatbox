@@ -17,13 +17,28 @@ type OAuthConfig = {
   clientId: string;
 };
 
+const NONCE_TTL_MS = 10 * 60_000; // 10 minutes
+const NONCE_CLEANUP_INTERVAL_MS = 60_000; // 1 minute
+
 export class OAuthService {
-  // Track valid nonces for CSRF protection
-  private pendingNonces = new Set<string>();
+  // Track valid nonces for CSRF protection with expiry timestamps
+  private pendingNonces = new Map<string, number>();
+  private cleanupTimer: ReturnType<typeof setInterval>;
+
+  constructor() {
+    // Periodically evict expired nonces to prevent memory leaks
+    this.cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [nonce, expiresAt] of this.pendingNonces) {
+        if (now > expiresAt) this.pendingNonces.delete(nonce);
+      }
+    }, NONCE_CLEANUP_INTERVAL_MS);
+    this.cleanupTimer.unref();
+  }
 
   generateAuthUrl(appSlug: string, userId: string, conversationId: string): { url: string; nonce: string } {
     const nonce = crypto.randomUUID();
-    this.pendingNonces.add(nonce);
+    this.pendingNonces.set(nonce, Date.now() + NONCE_TTL_MS);
 
     const state: OAuthState = {
       userId,
@@ -53,7 +68,9 @@ export class OAuthService {
     // Decode and validate state
     const decoded = JSON.parse(Buffer.from(stateParam, 'base64').toString()) as OAuthState;
 
-    if (!this.pendingNonces.has(decoded.nonce)) {
+    const nonceExpiry = this.pendingNonces.get(decoded.nonce);
+    if (!nonceExpiry || Date.now() > nonceExpiry) {
+      this.pendingNonces.delete(decoded.nonce);
       throw new OAuthError('Invalid or expired nonce', 403);
     }
 

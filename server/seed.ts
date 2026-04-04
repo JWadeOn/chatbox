@@ -13,17 +13,17 @@ const DEMO_USER = {
 const CHESS_APP = {
   slug: 'chess',
   name: 'Chess',
-  description: 'Interactive chess game with AI opponent',
+  description: 'Chess tutor for building strategic thinking, pattern recognition, and planning skills',
   authType: 'none',
   iframeUrl: '/apps/chess',
   toolSchemas: [
     {
       name: 'start_game',
-      description: 'Start a new chess game. Optionally specify which color the player wants.',
+      description: 'Start a chess lesson. The student plays against the board while the tutor coaches them through moves.',
       parameters: {
         type: 'object',
         properties: {
-          color: { type: 'string', enum: ['white', 'black'], description: 'Color for the player (default: white)' },
+          color: { type: 'string', enum: ['white', 'black'], description: 'Color for the student (default: white)' },
         },
       },
     },
@@ -40,12 +40,12 @@ const CHESS_APP = {
     },
     {
       name: 'get_board_state',
-      description: 'Get the current board state including FEN, move history, and material balance.',
+      description: 'Analyze the current position to help the student understand patterns, threats, and strategy.',
       parameters: { type: 'object', properties: {} },
     },
     {
       name: 'resign',
-      description: 'Resign the current game.',
+      description: 'Resign the current game. Use this as a teaching moment about when to concede gracefully.',
       parameters: { type: 'object', properties: {} },
     },
   ],
@@ -53,14 +53,14 @@ const CHESS_APP = {
 
 const WEATHER_APP = {
   slug: 'weather',
-  name: 'Weather',
-  description: 'Get current weather information for any location',
+  name: 'Weather Explorer',
+  description: 'Geography and earth science tool for exploring climate, weather patterns, and global locations',
   authType: 'none',
   iframeUrl: '/apps/weather',
   toolSchemas: [
     {
       name: 'get_weather',
-      description: 'Get the current weather for a given location.',
+      description: 'Look up weather for a location to explore geography, climate zones, and seasonal patterns.',
       parameters: {
         type: 'object',
         properties: {
@@ -74,8 +74,8 @@ const WEATHER_APP = {
 
 const SPOTIFY_APP = {
   slug: 'spotify',
-  name: 'Spotify',
-  description: 'Create and manage Spotify playlists based on mood',
+  name: 'Study Playlist',
+  description: 'Create focus and study playlists to support concentration and learning. Teaches digital literacy through OAuth.',
   authType: 'oauth2',
   iframeUrl: '/apps/spotify',
   oauthConfig: {
@@ -86,12 +86,12 @@ const SPOTIFY_APP = {
   toolSchemas: [
     {
       name: 'get_auth_status',
-      description: 'Check if the user has connected their Spotify account. Returns auth status and auth URL if needed.',
+      description: 'Check Spotify connection status. The auth flow teaches digital literacy and account permissions.',
       parameters: { type: 'object', properties: {} },
     },
     {
       name: 'create_playlist',
-      description: 'Create a Spotify playlist with tracks matching a mood. Requires Spotify authentication.',
+      description: 'Create a study playlist matching a mood to support focused learning and self-regulation skills.',
       parameters: {
         type: 'object',
         properties: {
