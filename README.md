@@ -1,8 +1,8 @@
 # ChatBridge
 
-AI chat platform with sandboxed third-party app integration, built for TutorMeAI (K-12 education, 200K DAU).
+AI chat platform with sandboxed third-party app integration, built for TutorMeAI (K-12 education, 200K DAU). A brownfield project built on top of a fork of [Chatbox](https://github.com/nicepkg/chatbox).
 
-Apps register tools via an MCP-aligned schema, render UI inside sandboxed iframes, and communicate with the platform over JSON-RPC 2.0 postMessage. The server handles all LLM interaction -- clients never call OpenAI directly.
+Third-party learning tools register via an MCP-aligned schema, render UI inside sandboxed iframes, and communicate with the platform over JSON-RPC 2.0 postMessage. The server handles all LLM interaction -- clients never call OpenAI directly.
 
 **Live:** [chatbox-production-9695.up.railway.app](https://chatbox-production-9695.up.railway.app)
 
@@ -90,23 +90,47 @@ Client (Next.js)                          Server (Node.js)
 - **Single active app** -- one app session per conversation at a time. New invocation terminates the previous session.
 - **Intent tracking** -- one active intent per conversation (`general_chat` or `app_intent`). Determines which tool schemas are injected into LLM context.
 - **Circuit breaker** -- 3 consecutive failures opens the breaker. Half-open after 30s.
-- **Context window management** -- compaction at 80% capacity. Completed app interactions replaced with `context_summary`, not raw JSON. Last 10 messages always retained.
+- **Rate limiting** -- 10 tool invocations per minute per user. Sliding window, returns 429 with retry-after.
+- **Timeouts** -- 15s per tool invocation, 60s per request. Dead connections cleaned up via WebSocket heartbeat (30s ping/pong).
+- **Context window management** -- last 50 messages loaded per request. Completed app interactions replaced with `context_summary`, not raw JSON.
 
-## Integrated Apps
+### Scalability Considerations
 
-### Chess
-Interactive chess game with AI opponent. The LLM uses function calling to manage game state, and the chess board renders in a sandboxed iframe with local move validation via chess.js.
+The platform targets 200K DAU with spiky traffic (school schedules). See `docs/TECHNICAL_PRESEARCH.md` for a full analysis of the "recess rush" scenario. Key strategies:
+
+- **Non-blocking app waiting** -- the `app_complete` endpoint and `app_sessions` table support decoupling tool invocation from the HTTP request lifecycle
+- **Connection management** -- DB pool configured with explicit limits, WebSocket connections capped at 2 per user
+- **Horizontal scaling path** -- stateless server (JWT auth, DB-backed sessions), with in-memory state (chess games, circuit breaker) identified for externalization to Redis
+- **Health monitoring** -- `GET /health` returns DB pool stats and memory usage
+
+## Integrated Learning Apps
+
+All apps are framed through an educational lens for the K-12 case study. See `docs/TECHNICAL_PRESEARCH.md` for the full rationale.
+
+### Chess (Strategic Thinking)
+Chess tutor that builds problem-solving, pattern recognition, and planning skills. The LLM coaches students during games -- analyzing positions, explaining tactics, and helping them think through consequences. The board renders in a sandboxed iframe with local move validation via chess.js.
 
 **Tools:** `chess__start_game`, `chess__make_move`, `chess__get_board_state`, `chess__resign`
 
-### Weather
-Current weather information for any location.
+### Weather Explorer (Geography & Earth Science)
+Geography and earth science exploration tool. Students look up weather in different cities to learn about climate zones, hemispheric seasons, and global geography. The chatbot contextualizes the data educationally.
 
 **Tools:** `weather__get_weather`
 
+### Study Playlist / Spotify (Focus & Study Skills)
+OAuth2-authenticated study playlist creator. Students create mood-based playlists to support focused learning. The OAuth flow doubles as a digital literacy lesson about account permissions and data sharing.
+
+**Tools:** `spotify__get_auth_status`, `spotify__create_playlist`
+
 ## API Reference
 
-All endpoints except auth return `401` without a valid JWT in the `Authorization: Bearer <token>` header.
+All endpoints except auth and health return `401` without a valid JWT in the `Authorization: Bearer <token>` header.
+
+### Health
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check with DB pool stats and memory usage |
 
 ### Auth
 
@@ -120,9 +144,9 @@ All endpoints except auth return `401` without a valid JWT in the `Authorization
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/conversations` | GET | List user's conversations |
+| `/api/conversations` | GET | List user's conversations (paginated, last 50) |
 | `/api/conversations` | POST | Create new conversation |
-| `/api/conversations/:id` | GET | Get conversation with messages |
+| `/api/conversations/:id` | GET | Get conversation with messages (last 50) |
 
 ### Apps
 
@@ -131,13 +155,13 @@ All endpoints except auth return `401` without a valid JWT in the `Authorization
 | `/api/apps` | GET | List registered apps |
 | `/api/apps/:slug` | GET | Get app by slug |
 | `/api/apps/register` | POST | Register a new app with tool schemas |
-| `/api/tools` | GET | Flat list of all tools from active apps |
+| `/api/tools` | GET | Flat list of all tools from active apps (cached 5min) |
 
 ### Chat (SSE)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/chat` | POST | Send message, receive SSE stream with tool calls and responses |
+| `/api/chat` | POST | Send message, receive SSE stream. 60s request timeout, 15s per tool. |
 
 **SSE event types:**
 - `{ content }` -- streamed assistant text
@@ -146,18 +170,26 @@ All endpoints except auth return `401` without a valid JWT in the `Authorization
 - `{ done: true }` -- stream complete
 - `{ error }` -- error message
 
+**Rate limit:** 10 tool invocations per minute per user. Returns tool error with retry-after on limit.
+
+### App Completion
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/app-complete` | POST | Signal app session completion with context summary |
+
 ### WebSocket
 
 | Endpoint | Protocol | Description |
 |----------|----------|-------------|
-| `/api/chat` | WS | Real-time chat with streaming. Requires `?token=<jwt>` |
+| `/api/chat` | WS | Real-time chat with streaming. Requires `?token=<jwt>`. Max 2 connections per user. 30s heartbeat. |
 
 ### OAuth
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/oauth/:appSlug/authorize` | GET | Redirect to OAuth provider |
-| `/api/oauth/:appSlug/callback` | GET | Handle OAuth redirect |
+| `/api/oauth/:appSlug/callback` | GET | Handle OAuth redirect (10min nonce TTL) |
 | `/api/oauth/:appSlug/status` | GET | Check if user has valid tokens |
 
 ## Third-Party App Integration
@@ -185,7 +217,7 @@ All iframe-platform communication uses JSON-RPC 2.0 over `window.postMessage`:
 sandbox="allow-scripts allow-forms allow-popups"
 ```
 
-`allow-same-origin` is **deliberately omitted** for external apps. Internal apps (`/apps/*`) get `allow-same-origin` since they're served from the same domain. Every message handler validates `event.origin`.
+`allow-same-origin` is **deliberately omitted** -- adding it would break the security model. Every message handler validates `event.origin`.
 
 ## Database Schema
 
@@ -229,6 +261,7 @@ Deployed on **Railway** with Docker. The `railway.toml` and `Dockerfile` are inc
 **Optional:**
 - `OPENAI_MODEL` -- model to use (default: `gpt-4o-mini`)
 - `PORT` -- server port (default: `3000`)
+- `DB_POOL_MAX` -- database connection pool size (default: `20`)
 - `LOG_LEVEL` -- pino log level (default: `info`)
 - `WEATHER_API_KEY` -- for weather app
 - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` -- for Spotify OAuth app
@@ -241,7 +274,7 @@ DATABASE_URL="<railway-url>" pnpm db:seed
 
 ## Brownfield Context
 
-This project is a brownfield build on top of a fork of [Chatbox](https://github.com/nicepkg/chatbox), an open-source Electron chat client. The architectural shift from Electron desktop app to Next.js web platform meant most code was built new, but Chatbox's patterns for markdown rendering, context window management, and token estimation informed the design. The `chatbox/` directory is retained as a read-only reference -- it is not imported or modified.
+This project is a brownfield build on top of a fork of [Chatbox](https://github.com/nicepkg/chatbox), an open-source Electron chat client. The architectural shift from Electron desktop app to Next.js web platform meant most code was built new, but Chatbox's patterns for markdown rendering, context window management, and token estimation informed the design. Chatbox-derived modules live in `src/lib/extracted/chatbox/` and `src/components/chatbox/` as owned, adapted code. The `chatbox/` directory is the forked foundation.
 
 ## Testing
 
