@@ -13,24 +13,32 @@ const DEMO_USER = {
 const CHESS_APP = {
   slug: 'chess',
   name: 'Chess',
-  description: 'Chess tutor for building strategic thinking, pattern recognition, and planning skills',
+  description:
+    'Chess with three modes: tutoring (AI coaching), vs Computer (Stockfish on Lichess), vs Human (multiplayer)',
   authType: 'none',
   iframeUrl: '/apps/chess',
   toolSchemas: [
     {
       name: 'start_game',
       description:
-        'Start a chess lesson. The student plays against the board while the tutor coaches them through moves.',
+        'Start a chess game. Modes: tutoring (local board with AI coaching), vs_computer (Stockfish on Lichess), vs_human (multiplayer challenge link).',
       parameters: {
         type: 'object',
         properties: {
+          mode: {
+            type: 'string',
+            enum: ['tutoring', 'vs_computer', 'vs_human'],
+            description: 'Game mode (default: tutoring)',
+          },
           color: { type: 'string', enum: ['white', 'black'], description: 'Color for the student (default: white)' },
+          level: { type: 'number', description: 'Stockfish difficulty 1-8, only for vs_computer (default: 3)' },
         },
       },
     },
     {
       name: 'make_move',
-      description: 'Make a chess move in standard algebraic notation (e.g. e4, Nf3, O-O) or UCI (e.g. e2e4).',
+      description:
+        'Make a chess move in standard algebraic notation (e.g. e4, Nf3, O-O) or UCI (e.g. e2e4). Only for tutoring mode.',
       parameters: {
         type: 'object',
         properties: {
@@ -41,12 +49,17 @@ const CHESS_APP = {
     },
     {
       name: 'get_board_state',
-      description: 'Analyze the current position to help the student understand patterns, threats, and strategy.',
+      description: 'Get the current board state. For Lichess games, fetches the live game status.',
       parameters: { type: 'object', properties: {} },
     },
     {
       name: 'resign',
-      description: 'Resign the current game. Use this as a teaching moment about when to concede gracefully.',
+      description: 'Resign or abandon the current game.',
+      parameters: { type: 'object', properties: {} },
+    },
+    {
+      name: 'get_game_link',
+      description: 'Get the Lichess game URL for an active vs_computer or vs_human game. Share this with the student.',
       parameters: { type: 'object', properties: {} },
     },
   ],
@@ -212,7 +225,11 @@ async function seed() {
     console.info(`Seeding ${app.slug} app...`);
     const [existing] = await db.select().from(apps).where(eq(apps.slug, app.slug)).limit(1);
     if (existing) {
-      console.info(`${app.slug} app already exists, skipping.`);
+      await db
+        .update(apps)
+        .set({ toolSchemas: app.toolSchemas, description: app.description, updatedAt: new Date() })
+        .where(eq(apps.id, existing.id));
+      console.info(`${app.slug} app updated with latest schemas.`);
     } else {
       await db.insert(apps).values(app);
       console.info(`${app.slug} app registered.`);

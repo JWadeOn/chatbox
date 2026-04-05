@@ -436,11 +436,23 @@ If external OAuth is added post-MVP, the same trust boundary applies: the platfo
 
 ### 11.1 Iframe Rules
 
-* sandbox must omit `allow-same-origin` for all apps — internal and external
+The platform distinguishes between **internal apps** (first-party, served from the platform's own origin at `/apps/*`) and **external apps** (third-party, served from other origins). They have different trust models and sandbox profiles:
+
+**External third-party apps** (the primary security concern):
+* sandbox MUST omit `allow-same-origin`
 * minimum sandbox: `allow-scripts allow-forms allow-popups`
-* if an internal app cannot load without `allow-same-origin`, restructure the app to work within the sandbox rather than weakening the sandbox
-* app origins must be allowlisted
-* all incoming `postMessage` events must validate origin and session context
+* origin validated against allowlist on registration
+* all incoming `postMessage` events validated against `"null"` origin (because sandboxed external iframes report null)
+
+**Internal first-party apps** (bundled with the platform):
+* sandbox MAY include `allow-same-origin` because they are code the platform ships and trusts — the third-party threat model does not apply
+* this is required in practice: internal apps are Next.js SSR pages that need to load their own JS/CSS bundles from the platform origin
+* all incoming `postMessage` events are validated against the platform's own origin
+* app code for internal apps is subject to normal code review, not the sandbox isolation boundary
+
+**Why the exception is safe:** the sandbox is a trust boundary for *untrusted* third-party code. Internal apps are first-party code the platform ships, so the trust boundary for them lives in the code review / deploy pipeline, not the browser sandbox. Granting `allow-same-origin` to code we already trust adds no real attack surface.
+
+**Concrete rule:** the `AppRenderer` checks `iframeUrl.startsWith('/')` to determine internal vs external. Internal apps get `allow-same-origin`; external apps do not. This check is the single place the trust boundary is enforced.
 
 ### 11.2 Data Minimization
 

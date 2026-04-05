@@ -12,7 +12,7 @@
 
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { ChatMessageViewModel, MessageToolCallPart } from '@/types/chat';
 import { getTextContent, getToolCallParts } from '@/types/chat';
 import Markdown from './Markdown';
@@ -21,7 +21,68 @@ import Markdown from './Markdown';
 // Tool call renderer
 // ---------------------------------------------------------------------------
 
+/** Build a human-readable one-line summary of a tool result. */
+function buildSummary(appSlug: string, toolName: string, result: Record<string, unknown>): string {
+  // Chess-specific summaries
+  if (appSlug === 'chess') {
+    if (toolName === 'start_game') {
+      const mode = result.mode as string | undefined;
+      if (mode === 'vs_computer') {
+        return `Started game vs Stockfish (level ${result.level ?? '?'})`;
+      }
+      if (mode === 'vs_human') {
+        return 'Created multiplayer challenge';
+      }
+      return `Started tutoring game — playing as ${result.player_color ?? 'white'}`;
+    }
+    if (toolName === 'make_move') {
+      if (result.success) return `Played ${result.last_move}${result.game_over ? ` — ${result.result}` : ''}`;
+      return `Invalid move: ${result.error}`;
+    }
+    if (toolName === 'get_board_state') {
+      if (result.game_over) return `Game over: ${result.status}${result.winner ? ` (${result.winner} wins)` : ''}`;
+      if (result.mode) return `Game status: ${result.status}`;
+      return `Turn: ${result.current_turn}, ${(result.move_history as unknown[] | undefined)?.length ?? 0} moves played`;
+    }
+    if (toolName === 'resign') return 'Game resigned';
+    if (toolName === 'get_game_link') return 'Retrieved game link';
+  }
+
+  // Khan-specific
+  if (appSlug === 'khan') {
+    if (toolName === 'open_topic') return `Opened topic: ${result.topic}`;
+    if (toolName === 'explain_concept') return `Explained: ${result.concept}`;
+    if (toolName === 'quiz') return 'Generated quiz question';
+  }
+
+  // Flashcards-specific
+  if (appSlug === 'flashcards') {
+    if (toolName === 'create_deck') {
+      const deck = result.deck as { title?: string; cardCount?: number } | undefined;
+      return `Created deck "${deck?.title}" (${deck?.cardCount} cards)`;
+    }
+    if (toolName === 'load_deck') {
+      const deck = result.deck as { title?: string; cardCount?: number } | undefined;
+      return `Loaded deck "${deck?.title}" (${deck?.cardCount} cards)`;
+    }
+    if (toolName === 'answer_card') return result.correct ? 'Correct answer' : `Incorrect (expected: ${result.expected})`;
+    if (toolName === 'get_progress') {
+      const sessions = result.sessions as unknown[] | undefined;
+      return `Retrieved ${sessions?.length ?? 0} progress records`;
+    }
+  }
+
+  // First Principles
+  if (appSlug === 'firstprinciples' && toolName === 'analyze') {
+    return `Analyzed: ${result.question}`;
+  }
+
+  return `${toolName} completed`;
+}
+
 function ToolCallPartView({ part }: { part: MessageToolCallPart }) {
+  const [expanded, setExpanded] = useState(false);
+
   let parsedResult: Record<string, unknown> = {};
   if (part.result != null) {
     if (typeof part.result === 'object') {
@@ -32,27 +93,73 @@ function ToolCallPartView({ part }: { part: MessageToolCallPart }) {
   }
 
   const isError = part.state === 'error' || 'error' in parsedResult;
+  const summary = isError
+    ? String(parsedResult.error || part.result)
+    : part.state === 'call'
+      ? 'Invoking...'
+      : buildSummary(part.appSlug, part.toolName, parsedResult);
+
+  // Extract shareable link if present (for chess Lichess modes)
+  const gameUrl = parsedResult.game_url as string | undefined;
+  const challengeUrl = parsedResult.challenge_url as string | undefined;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-indigo-100 bg-indigo-50 text-xs">
-      <div className="flex items-center gap-2 border-b border-indigo-100 bg-indigo-100 px-3 py-1.5">
-        <span className="font-semibold text-indigo-700">{part.appSlug}</span>
-        <span className="text-indigo-500">{part.toolName}</span>
+    <div
+      className={`overflow-hidden rounded-lg border text-xs ${
+        isError ? 'border-red-200 bg-red-50' : 'border-indigo-100 bg-indigo-50'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
+          isError ? 'hover:bg-red-100' : 'hover:bg-indigo-100'
+        }`}
+      >
+        <span className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-wider ${isError ? 'text-red-600' : 'text-indigo-600'}`}>
+          {part.appSlug}
+        </span>
+        <span className={`flex-1 truncate ${isError ? 'text-red-700' : 'text-gray-700'}`}>{summary}</span>
         {part.state === 'call' && (
-          <span className="ml-auto inline-block h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
         )}
-      </div>
-      <div className="px-3 py-2">
-        {isError ? (
-          <span className="text-red-600">Error: {String(parsedResult.error || part.result)}</span>
-        ) : part.state === 'call' ? (
-          <span className="italic text-gray-500">Invoking...</span>
-        ) : (
-          <pre className="overflow-x-auto whitespace-pre-wrap text-gray-700">
+        <span className={`flex-shrink-0 text-[10px] ${isError ? 'text-red-400' : 'text-indigo-400'}`}>
+          {expanded ? '−' : '+'}
+        </span>
+      </button>
+
+      {/* Inline action buttons for known link patterns */}
+      {!expanded && !isError && (gameUrl || challengeUrl) && (
+        <div className="flex gap-2 border-t border-indigo-100 px-3 py-1.5">
+          {gameUrl && (
+            <a
+              href={gameUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700"
+            >
+              Open on Lichess
+            </a>
+          )}
+          {challengeUrl && challengeUrl !== gameUrl && (
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(challengeUrl)}
+              className="inline-flex items-center rounded border border-indigo-300 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50"
+            >
+              Copy challenge link
+            </button>
+          )}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="border-t border-indigo-100 px-3 py-2">
+          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">
             {JSON.stringify(parsedResult, null, 2)}
           </pre>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

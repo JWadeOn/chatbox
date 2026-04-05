@@ -140,8 +140,11 @@ const BlockCode = memo(function BlockCode({
 }) {
   const label = LANG_LABELS[language.toLowerCase()] || language.toUpperCase();
   const [copied, setCopied] = useState(false);
-  const needCollapse = !!uniqueId && children.split('\n').length > CODE_BLOCK_COLLAPSE_LINE_THRESHOLD;
+  const lineCount = children.split('\n').length;
+  const needCollapse = !!uniqueId && lineCount > CODE_BLOCK_COLLAPSE_LINE_THRESHOLD;
   const { collapsed, toggle } = useCollapseState(uniqueId || '');
+  const isPlainText = !language || language.toLowerCase() === 'text' || language.toLowerCase() === 'plaintext';
+  const showLineNumbers = !isPlainText && lineCount > 3;
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(children);
@@ -150,51 +153,82 @@ const BlockCode = memo(function BlockCode({
   }, [children]);
 
   return (
-    <div className="my-2 overflow-hidden rounded-md border border-gray-700">
-      {/* Header bar */}
-      <div className="flex items-center justify-between bg-gray-800 px-3 py-1.5">
-        <div className="flex items-center gap-2">
-          {generating && (
-            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-blue-400" />
-          )}
-          <span className="font-mono text-xs font-semibold text-gray-400">{label}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="rounded px-1.5 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-          {needCollapse && (
+    <div className="group relative my-2 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+      {/* Header — only show for actual code with a language label */}
+      {!isPlainText && (
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-100 px-3 py-1">
+          <div className="flex items-center gap-2">
+            {generating && <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />}
+            <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
+          </div>
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={toggle}
-              className="rounded px-1.5 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200"
+              onClick={handleCopy}
+              className="rounded px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
             >
-              {collapsed ? 'Expand' : 'Collapse'}
+              {copied ? 'Copied!' : 'Copy'}
             </button>
-          )}
+            {needCollapse && (
+              <button
+                type="button"
+                onClick={toggle}
+                className="rounded px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+              >
+                {collapsed ? 'Expand' : 'Collapse'}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Floating copy button for plain text blocks */}
+      {isPlainText && (
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="absolute right-1.5 top-1.5 z-10 rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-gray-500 opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-white hover:text-gray-700 group-hover:opacity-100"
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      )}
 
       {/* Code content */}
       <div className={needCollapse && collapsed ? 'max-h-40 overflow-hidden' : ''}>
-        <SyntaxHighlighter
-          style={oneDark}
-          language={language}
-          PreTag="div"
-          showLineNumbers
-          customStyle={{
-            margin: 0,
-            borderRadius: 0,
-            border: 'none',
-            background: 'transparent',
-          }}
-        >
-          {children}
-        </SyntaxHighlighter>
+        {isPlainText ? (
+          <pre
+            style={{
+              margin: 0,
+              padding: '8px 12px',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              color: '#374151',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {children}
+          </pre>
+        ) : (
+          <SyntaxHighlighter
+            style={oneDark}
+            language={language}
+            PreTag="div"
+            showLineNumbers={showLineNumbers}
+            customStyle={{
+              margin: 0,
+              borderRadius: 0,
+              border: 'none',
+              background: '#1e1e1e',
+              fontSize: '12px',
+              padding: '12px',
+            }}
+          >
+            {children}
+          </SyntaxHighlighter>
+        )}
       </div>
     </div>
   );

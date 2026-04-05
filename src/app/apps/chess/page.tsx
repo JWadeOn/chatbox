@@ -55,8 +55,34 @@ export default function ChessApp() {
   const [status, setStatus] = useState('Click a piece to start playing');
   const [gameOver, setGameOver] = useState(false);
 
+  // Lichess mode state
+  const [mode, setMode] = useState<'tutoring' | 'vs_computer' | 'vs_human'>('tutoring');
+  const [lichessUrl, setLichessUrl] = useState<string | null>(null);
+  const [challengeUrl, setChallengeUrl] = useState<string | null>(null);
+  const [lichessStatus, setLichessStatus] = useState('in_progress');
+
   const flipped = playerColor === 'b';
   const board = fenToBoard(fen);
+
+  const [lichessGameId, setLichessGameId] = useState<string | null>(null);
+
+  // Read query params on mount to detect Lichess mode from server-provided app_render URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get('mode');
+    if (urlMode === 'vs_computer' || urlMode === 'vs_human') {
+      setMode(urlMode);
+      const gameUrl = params.get('game_url');
+      const gameId = params.get('game_id');
+      const challUrl = params.get('challenge_url');
+      const statusParam = params.get('status');
+      if (gameUrl) setLichessUrl(gameUrl);
+      if (gameId) setLichessGameId(gameId);
+      if (challUrl) setChallengeUrl(challUrl);
+      if (statusParam) setLichessStatus(statusParam);
+    }
+  }, []);
 
   const sendToParent = useCallback((msg: Record<string, unknown>) => {
     if (window.parent !== window) {
@@ -163,40 +189,82 @@ export default function ChessApp() {
         const id = data.id as number;
 
         if (params.tool === 'start_game') {
-          const color = (params.arguments?.color as string)?.[0] || 'w';
-          gameRef.current = new Chess();
-          setPlayerColor(color === 'b' ? 'b' : 'w');
-          setFen(gameRef.current.fen());
-          setSelected(null);
-          setLastMove(null);
-          setGameOver(false);
-          setStatus(`Game started! You are ${color === 'b' ? 'Black' : 'White'}.`);
-          sendToParent({
-            jsonrpc: '2.0',
-            result: {
-              board_fen: gameRef.current.fen(),
-              player_color: color === 'b' ? 'black' : 'white',
-              status: 'in_progress',
-            },
-            id,
-          });
+          const gameMode = (params.arguments?.mode as string) || 'tutoring';
+
+          if (gameMode === 'vs_computer' || gameMode === 'vs_human') {
+            // Lichess mode — server already created the game, we just display the link
+            setMode(gameMode);
+            const gameUrl = params.arguments?.game_url as string;
+            const challUrl = params.arguments?.challenge_url as string;
+            if (gameUrl) setLichessUrl(gameUrl);
+            if (challUrl) setChallengeUrl(challUrl);
+            setLichessStatus(gameMode === 'vs_human' ? 'waiting_for_opponent' : 'in_progress');
+            setGameOver(false);
+            // Auto-open on Lichess
+            if (gameUrl) window.open(gameUrl, '_blank');
+            sendToParent({
+              jsonrpc: '2.0',
+              result: { mode: gameMode, game_url: gameUrl, status: 'opened' },
+              id,
+            });
+          } else {
+            // Tutoring mode — local board
+            setMode('tutoring');
+            const color = (params.arguments?.color as string)?.[0] || 'w';
+            gameRef.current = new Chess();
+            setPlayerColor(color === 'b' ? 'b' : 'w');
+            setFen(gameRef.current.fen());
+            setSelected(null);
+            setLastMove(null);
+            setGameOver(false);
+            setStatus(`Game started! You are ${color === 'b' ? 'Black' : 'White'}.`);
+            sendToParent({
+              jsonrpc: '2.0',
+              result: {
+                board_fen: gameRef.current.fen(),
+                player_color: color === 'b' ? 'black' : 'white',
+                status: 'in_progress',
+              },
+              id,
+            });
+          }
         } else if (params.tool === 'get_board_state') {
-          const game = gameRef.current;
-          sendToParent({
-            jsonrpc: '2.0',
-            result: {
-              board_fen: game.fen(),
-              move_history: game.history(),
-              current_turn: game.turn() === 'w' ? 'white' : 'black',
-            },
-            id,
-          });
+          if (mode !== 'tutoring') {
+            // For Lichess games, the server fetches status — relay the result
+            const result = params.arguments as Record<string, unknown>;
+            if (result.game_over) {
+              setLichessStatus(result.status as string);
+              setGameOver(true);
+              sendToParent({
+                jsonrpc: '2.0',
+                method: 'app_complete',
+                params: {
+                  summary: `Game over: ${result.status}${result.winner ? `. Winner: ${result.winner}` : ''}.`,
+                  data: result,
+                },
+              });
+            } else {
+              setLichessStatus((result.status as string) || 'in_progress');
+            }
+            sendToParent({ jsonrpc: '2.0', result, id });
+          } else {
+            const game = gameRef.current;
+            sendToParent({
+              jsonrpc: '2.0',
+              result: {
+                board_fen: game.fen(),
+                move_history: game.history(),
+                current_turn: game.turn() === 'w' ? 'white' : 'black',
+              },
+              id,
+            });
+          }
         }
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [sendToParent]);
+  }, [mode, sendToParent]);
 
   // Signal iframe_ready — retry until acknowledged
   useEffect(() => {
@@ -212,6 +280,125 @@ export default function ChessApp() {
 
   const displayBoard = flipped ? [...board].reverse().map((row) => [...row].reverse()) : board;
 
+  // Lichess mode — show link panel instead of local board
+  if (mode !== 'tutoring') {
+    const embedUrl = lichessGameId ? `https://lichess.org/embed/${lichessGameId}?theme=brown&bg=light` : null;
+
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '12px',
+          fontFamily: 'system-ui, sans-serif',
+          background: '#fff',
+          minHeight: '100vh',
+        }}
+      >
+        {/* Compact header */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px',
+            padding: '0 4px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>{'\u265E'}</span>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#333' }}>
+                {mode === 'vs_computer' ? 'vs Stockfish' : 'Multiplayer'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888' }}>
+                {gameOver
+                  ? `Game over: ${lichessStatus}`
+                  : lichessStatus === 'waiting_for_opponent'
+                    ? 'Waiting for opponent...'
+                    : 'In progress'}
+              </div>
+            </div>
+          </div>
+          {lichessUrl && (
+            <a
+              href={lichessUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: '11px',
+                color: '#1a73e8',
+                textDecoration: 'none',
+                padding: '4px 10px',
+                border: '1px solid #d0d7de',
+                borderRadius: '6px',
+                fontWeight: 500,
+              }}
+            >
+              Open on Lichess &#8599;
+            </a>
+          )}
+        </div>
+
+        {/* Embedded Lichess board */}
+        {embedUrl && (
+          <div style={{ flex: 1, minHeight: '500px', display: 'flex', flexDirection: 'column' }}>
+            <iframe
+              src={embedUrl}
+              title="Lichess game"
+              style={{
+                width: '100%',
+                flex: 1,
+                minHeight: '500px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                background: '#fff',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Multiplayer challenge link */}
+        {challengeUrl && !gameOver && mode === 'vs_human' && (
+          <div
+            style={{
+              marginTop: '8px',
+              padding: '10px 12px',
+              background: '#f0f9ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '8px',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#1e40af',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '4px',
+              }}
+            >
+              Share with your opponent
+            </div>
+            <div
+              style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#1a73e8',
+                wordBreak: 'break-all',
+                fontFamily: 'ui-monospace, Menlo, monospace',
+              }}
+            >
+              {challengeUrl}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Tutoring mode — local board
   return (
     <div
       style={{

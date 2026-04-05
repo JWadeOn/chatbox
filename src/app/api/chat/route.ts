@@ -134,7 +134,17 @@ You help students learn by combining conversation with hands-on learning tools. 
 ## Available Learning Tools
 
 ### Chess (Strategic Thinking)
-A chess tutor that builds problem-solving, pattern recognition, and planning skills. Use chess__start_game to begin a game, chess__make_move to play moves, chess__get_board_state to analyze the position. During games, coach the student — explain tactical ideas, point out patterns, and help them think through consequences of moves.
+A chess experience with three modes. **When a student asks to play chess, you MUST ask which mode they want first — do not call start_game until they choose.** Present the options briefly:
+1. **Tutoring** — a local board where I coach you through moves (good for learning)
+2. **vs Computer** — play Stockfish on Lichess, levels 1-8
+3. **vs Human** — get a shareable link to challenge a friend
+
+Then call chess__start_game with the chosen mode:
+- Tutoring: use mode='tutoring'. Then use chess__make_move to play and chess__get_board_state to analyze. **The board is rendered visually in an iframe — NEVER draw ASCII/text boards in your responses.** Just coach the student on tactics.
+- vs Computer: use mode='vs_computer' with optional level (1-8, default 3). The student plays on Lichess in a new tab — share the game link.
+- vs Human: use mode='vs_human'. Share the challenge link so their friend can join.
+
+For Lichess modes, use chess__get_board_state to check game status when asked, and chess__get_game_link to reshare the link.
 
 ### Khan Academy Companion (Topic Exploration)
 A topic companion for exploring any subject. Use khan__open_topic with a topic name to open a lesson view. Use khan__explain_concept with a concept to get a student-friendly explanation. Use khan__quiz to generate a quiz question on the current topic. Guide the student through topics, encourage curiosity, and help them test their understanding.
@@ -265,12 +275,23 @@ A critical thinking tool that breaks down questions into first principles. Use f
               // Send app_render for apps that have a UI component
               const triggers = APP_RENDER_TRIGGERS[appSlug];
               if (triggers?.includes(toolName) && APP_IFRAME_URLS[appSlug]) {
+                // Append tool result as URL-encoded query params so the iframe can read them on mount
+                const resultObj = result as Record<string, unknown>;
+                const extraParams = new URLSearchParams();
+                for (const [key, value] of Object.entries(resultObj || {})) {
+                  if (value !== undefined && value !== null && typeof value !== 'object') {
+                    extraParams.set(key, String(value));
+                  }
+                }
+                const baseUrl = APP_IFRAME_URLS[appSlug];
+                const iframeUrlWithResult = extraParams.toString() ? `${baseUrl}?${extraParams.toString()}` : baseUrl;
+
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
                       type: 'app_render',
                       appSlug,
-                      iframeUrl: APP_IFRAME_URLS[appSlug],
+                      iframeUrl: iframeUrlWithResult,
                       sessionId,
                     })}\n\n`
                   )

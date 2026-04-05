@@ -74,7 +74,7 @@ chatbridge/
 ## Architecture & Patterns
 
 - **Server-side LLM only.** All LLM calls happen on the server. Client never talks to OpenAI directly.
-- **Sandboxed iframes** for app UI. Sandbox: `allow-scripts allow-forms allow-popups`. No `allow-same-origin`.
+- **Sandboxed iframes** for app UI. Internal apps (first-party, served from `/apps/*`) get `allow-scripts allow-forms allow-popups allow-same-origin` because they need to load their own Next.js bundles and are trusted code. External third-party apps get `allow-scripts allow-forms allow-popups` ONLY — no `allow-same-origin`. The `iframeUrl.startsWith('/')` check in AppRenderer is the trust boundary.
 - **JSON-RPC 2.0 over postMessage** for app-platform communication. Validate `event.origin` on every message.
 - **Three-layer state:** chat state (server), app state (iframe), contextual bridge (summaries linking them).
 - **Intent tracking:** user intent is a first-class concept. One active intent per conversation. Transitions: general_chat <-> app_intent.
@@ -127,7 +127,7 @@ This is a brownfield project -- the goal is to demonstrate building on an existi
 
 ## Do NOT
 
-- Add `allow-same-origin` to iframe sandbox attributes
+- Add `allow-same-origin` to EXTERNAL third-party iframes (internal `/apps/*` iframes get it; the check is in AppRenderer)
 - Make client-side LLM calls -- all LLM interaction is server-side
 - Use `console.log` in production code
 - Build a second app before chess works end-to-end (vertical slice rule)

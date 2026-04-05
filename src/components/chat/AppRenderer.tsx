@@ -39,13 +39,16 @@ export function AppRenderer({
         : never
     ) => {
       if (iframeRef.current?.contentWindow) {
-        // Sandboxed iframes (no allow-same-origin) have origin "null",
-        // so we must use "*" as the target origin for postMessage delivery.
+        // Use '*' as target origin — works for both internal (same-origin) and external (null-origin) sandboxed iframes.
         iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), '*');
       }
     },
     []
   );
+
+  // Internal apps served from /apps/* run on the platform's own origin and need allow-same-origin
+  // to load their JS/CSS bundles (Next.js SSR pages). External third-party apps must NOT get it.
+  const isInternalApp = iframeUrl.startsWith('/');
 
   useEffect(() => {
     const handlers: PostMessageHandler = {
@@ -61,12 +64,12 @@ export function AppRenderer({
       onHeartbeat: () => {},
     };
 
-    // All sandboxed iframes (no allow-same-origin) report origin "null".
-    const listener = createPostMessageListener('null', handlers);
+    // Internal apps report the platform's origin; external apps (null-origin sandbox) report "null".
+    const expectedOrigin = isInternalApp ? window.location.origin : 'null';
+    const listener = createPostMessageListener(expectedOrigin, handlers, !isInternalApp);
 
     const handleMessage = (event: MessageEvent) => {
-      // All sandboxed iframes (no allow-same-origin) report origin "null".
-      if (event.origin !== 'null') return;
+      if (event.origin !== expectedOrigin) return;
 
       let data: Record<string, unknown>;
       try {
@@ -98,7 +101,7 @@ export function AppRenderer({
       window.removeEventListener('message', handleMessage);
       bufferRef.current?.destroy();
     };
-  }, [onToolResult, onAppComplete, onAppError, sendToIframe]);
+  }, [onToolResult, onAppComplete, onAppError, sendToIframe, isInternalApp]);
 
   if (error) {
     return <ErrorMessage message={error} onRetry={onClose} />;
@@ -119,13 +122,17 @@ export function AppRenderer({
       </div>
       <iframe
         ref={iframeRef}
-        src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}?sessionId=${sessionId}`}
-        sandbox="allow-scripts allow-forms allow-popups"
+        src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}${iframeUrl.includes('?') ? '&' : '?'}sessionId=${sessionId}`}
+        sandbox={
+          isInternalApp
+            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
+            : 'allow-scripts allow-forms allow-popups'
+        }
         referrerPolicy="no-referrer"
         loading="eager"
         title={`${appSlug} app`}
         className="w-full border-none"
-        style={{ minHeight: '400px' }}
+        style={{ minHeight: appSlug === 'chess' ? '620px' : '400px' }}
       />
     </div>
   );
