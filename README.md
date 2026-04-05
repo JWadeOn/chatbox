@@ -94,14 +94,28 @@ Client (Next.js)                          Server (Node.js)
 - **Timeouts** -- 15s per tool invocation, 60s per request. Dead connections cleaned up via WebSocket heartbeat (30s ping/pong).
 - **Context window management** -- last 50 messages loaded per request. Completed app interactions replaced with `context_summary`, not raw JSON.
 
-### Scalability Considerations
+### Scalability: The "Recess Rush" Problem
 
-The platform targets 200K DAU with spiky traffic (school schedules). See `docs/TECHNICAL_PRESEARCH.md` for a full analysis of the "recess rush" scenario. Key strategies:
+TutorMeAI serves 200K DAU on school schedules. The hardest scenario is the **thundering herd**: thousands of students return from recess simultaneously and start interacting with apps. Each student's request may invoke a tool, render an iframe, and wait for the app to finish. We don't control how long the third-party app takes.
 
-- **Non-blocking app waiting** -- the `app_complete` endpoint and `app_sessions` table support decoupling tool invocation from the HTTP request lifecycle
-- **Connection management** -- DB pool configured with explicit limits, WebSocket connections capped at 2 per user
-- **Horizontal scaling path** -- stateless server (JWT auth, DB-backed sessions), with in-memory state (chess games, circuit breaker) identified for externalization to Redis
-- **Health monitoring** -- `GET /health` returns DB pool stats and memory usage
+See `docs/TECHNICAL_PRESEARCH.md` for the full analysis. Here's what we built and what the production path looks like:
+
+**What's implemented:**
+- **Timeouts** -- 15s per tool invocation (`Promise.race`), 60s per request. Prevents any single slow app from holding a connection indefinitely.
+- **Rate limiting** -- 10 tool invocations/min/user (sliding window). Prevents thundering herd from overwhelming downstream LLM APIs.
+- **DB pool configuration** -- explicit `max`, `connectionTimeoutMillis` (5s fail-fast), `idleTimeoutMillis`. Configurable via `DB_POOL_MAX`.
+- **WebSocket limits** -- 2 connections per user, 30s heartbeat ping/pong to detect and clean dead sockets.
+- **Paginated queries** -- conversations and messages capped at 50 per request. Prevents unbounded memory growth.
+- **Tool discovery cache** -- 5-minute TTL avoids querying the apps table on every chat message.
+- **Health endpoint** -- `GET /health` returns DB pool stats and memory usage for load balancer probes.
+- **Circuit breaker** -- 3 consecutive failures opens the breaker for 30s. Prevents cascade failures when an app is down.
+- **OAuth nonce TTL** -- 10-minute expiry with periodic cleanup. Prevents unbounded memory growth.
+
+**Production scaling path (not yet implemented):**
+- **Non-blocking app invocation** -- decouple tool wait from the SSE response. Return `app_render` immediately, close the stream, let completion arrive async via `POST /api/app-complete` (endpoint already exists).
+- **Externalize in-memory state to Redis** -- chess games, circuit breaker, rate limiter currently use in-process Maps. Required for multi-instance horizontal scaling.
+- **Connection pooling proxy** -- PgBouncer for 10K+ concurrent DB clients.
+- **Predictive scaling** -- school schedules are predictable. Pre-warm instances before known bell times.
 
 ## Integrated Learning Apps
 

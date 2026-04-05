@@ -78,10 +78,7 @@ export class ConversationService {
         })
         .where(eq(conversations.id, conversationId));
     } else {
-      await db
-        .update(conversations)
-        .set({ updatedAt: new Date() })
-        .where(eq(conversations.id, conversationId));
+      await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId));
     }
 
     return message;

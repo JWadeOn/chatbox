@@ -23,7 +23,7 @@ describe('estimateTokens', () => {
     const english = estimateTokens('hello');
     const cjk = estimateTokens('你好世界你好');
     // CJK should be relatively more tokens per character
-    expect(cjk / 6).toBeGreaterThan(english / 5 * 0.5);
+    expect(cjk / 6).toBeGreaterThan((english / 5) * 0.5);
   });
 });
 
@@ -60,7 +60,12 @@ describe('checkCompactionNeeded', () => {
 });
 
 describe('buildContext', () => {
-  const makeMsg = (id: string, role: ChatMessageViewModel['role'], text: string, extra?: Partial<ChatMessageViewModel>): ChatMessageViewModel => ({
+  const makeMsg = (
+    id: string,
+    role: ChatMessageViewModel['role'],
+    text: string,
+    extra?: Partial<ChatMessageViewModel>
+  ): ChatMessageViewModel => ({
     id,
     role,
     contentParts: [{ type: 'text', text }],
@@ -72,10 +77,7 @@ describe('buildContext', () => {
   });
 
   it('returns all messages when under the limit', () => {
-    const messages = [
-      makeMsg('1', 'user', 'hello'),
-      makeMsg('2', 'assistant', 'hi'),
-    ];
+    const messages = [makeMsg('1', 'user', 'hello'), makeMsg('2', 'assistant', 'hi')];
     const ctx = buildContext(messages);
     expect(ctx).toHaveLength(2);
   });
@@ -107,7 +109,11 @@ describe('buildContext', () => {
 });
 
 describe('cleanToolCallParts', () => {
-  const makeMsg = (id: string, role: ChatMessageViewModel['role'], parts: ChatMessageViewModel['contentParts']): ChatMessageViewModel => ({
+  const makeMsg = (
+    id: string,
+    role: ChatMessageViewModel['role'],
+    parts: ChatMessageViewModel['contentParts']
+  ): ChatMessageViewModel => ({
     id,
     role,
     contentParts: parts,
@@ -118,7 +124,17 @@ describe('cleanToolCallParts', () => {
       makeMsg('u1', 'user', [{ type: 'text', text: 'old question' }]),
       makeMsg('a1', 'assistant', [{ type: 'text', text: 'old answer' }]),
       makeMsg('u2', 'user', [{ type: 'text', text: 'play chess' }]),
-      makeMsg('t1', 'tool', [{ type: 'tool-call', state: 'result', toolCallId: 'tc1', appSlug: 'chess', toolName: 'start', args: {}, result: {} }]),
+      makeMsg('t1', 'tool', [
+        {
+          type: 'tool-call',
+          state: 'result',
+          toolCallId: 'tc1',
+          appSlug: 'chess',
+          toolName: 'start',
+          args: {},
+          result: {},
+        },
+      ]),
       makeMsg('a2', 'assistant', [{ type: 'text', text: 'Game started!' }]),
     ];
     const cleaned = cleanToolCallParts(messages, 2);
@@ -130,10 +146,30 @@ describe('cleanToolCallParts', () => {
   it('removes tool calls from old rounds', () => {
     const messages = [
       makeMsg('u1', 'user', [{ type: 'text', text: 'first question' }]),
-      makeMsg('t1', 'tool', [{ type: 'tool-call', state: 'result', toolCallId: 'tc1', appSlug: 'chess', toolName: 'start', args: {}, result: {} }]),
+      makeMsg('t1', 'tool', [
+        {
+          type: 'tool-call',
+          state: 'result',
+          toolCallId: 'tc1',
+          appSlug: 'chess',
+          toolName: 'start',
+          args: {},
+          result: {},
+        },
+      ]),
       makeMsg('a1', 'assistant', [{ type: 'text', text: 'answer 1' }]),
       makeMsg('u2', 'user', [{ type: 'text', text: 'second question' }]),
-      makeMsg('t2', 'tool', [{ type: 'tool-call', state: 'result', toolCallId: 'tc2', appSlug: 'chess', toolName: 'move', args: {}, result: {} }]),
+      makeMsg('t2', 'tool', [
+        {
+          type: 'tool-call',
+          state: 'result',
+          toolCallId: 'tc2',
+          appSlug: 'chess',
+          toolName: 'move',
+          args: {},
+          result: {},
+        },
+      ]),
       makeMsg('a2', 'assistant', [{ type: 'text', text: 'answer 2' }]),
       makeMsg('u3', 'user', [{ type: 'text', text: 'third question' }]),
       makeMsg('a3', 'assistant', [{ type: 'text', text: 'answer 3' }]),
