@@ -63,12 +63,20 @@ export function AppRenderer({
       onHeartbeat: () => {},
     };
 
-    const listener = createPostMessageListener(origin, handlers);
+    const isSameDomain = iframeUrl.startsWith('/');
+    const listener = createPostMessageListener(origin, handlers, isSameDomain);
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== origin) return;
+      // Sandboxed iframes without allow-same-origin have origin "null".
+      // Accept "null" for same-domain apps, match resolved origin for external apps.
+      if (event.origin !== origin && !(isSameDomain && event.origin === 'null')) return;
 
-      const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      let data: Record<string, unknown>;
+      try {
+        data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      } catch {
+        return;
+      }
       if (data.method === 'iframe_ready') {
         setLoading(false);
         bufferRef.current?.markReady();
@@ -115,11 +123,15 @@ export function AppRenderer({
       <iframe
         ref={iframeRef}
         src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}?sessionId=${sessionId}`}
-        /* All apps use the same restricted sandbox — allow-same-origin is
-           deliberately omitted per the security model in CLAUDE.md. */
-        sandbox="allow-scripts allow-forms allow-popups"
+        /* Internal apps (same-domain, /apps/*) need allow-same-origin to load
+           their JS/CSS bundles. External third-party apps must NOT get it. */
+        sandbox={
+          iframeUrl.startsWith('/')
+            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
+            : 'allow-scripts allow-forms allow-popups'
+        }
         referrerPolicy="no-referrer"
-        loading="lazy"
+        loading="eager"
         title={`${appSlug} app`}
         className="w-full border-none"
         style={{ minHeight: '400px' }}

@@ -20,9 +20,13 @@ export type PostMessageHandler = {
   onHeartbeat: (timestamp: number) => void;
 };
 
-export function createPostMessageListener(expectedOrigin: string, handlers: PostMessageHandler) {
+export function createPostMessageListener(
+  expectedOrigin: string,
+  handlers: PostMessageHandler,
+  allowNullOrigin = false
+) {
   return (event: MessageEvent) => {
-    if (event.origin !== expectedOrigin) {
+    if (event.origin !== expectedOrigin && !(allowNullOrigin && event.origin === 'null')) {
       console.warn(`[postmessage] Origin rejected: received ${event.origin}, expected ${expectedOrigin}`);
       return;
     }
