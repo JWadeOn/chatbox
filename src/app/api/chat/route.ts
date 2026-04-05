@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { ChessToolHandler } from '../../../../server/apps/chess';
-import { SpotifyToolHandler } from '../../../../server/apps/spotify';
-import { WeatherToolHandler } from '../../../../server/apps/weather';
+import { FirstPrinciplesToolHandler } from '../../../../server/apps/firstprinciples';
+import { FlashcardsToolHandler } from '../../../../server/apps/flashcards';
+import { KhanToolHandler } from '../../../../server/apps/khan';
 import { toolRateLimiter } from '../../../../server/lib/rate-limiter';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
 import { completionService } from '../../../../server/services/completion.service';
@@ -14,19 +15,24 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
 // App tool handlers (keyed by app slug)
 const chessHandler = new ChessToolHandler();
-const weatherHandler = new WeatherToolHandler();
-const spotifyHandler = new SpotifyToolHandler();
+const khanHandler = new KhanToolHandler();
+const flashcardsHandler = new FlashcardsToolHandler();
+const firstPrinciplesHandler = new FirstPrinciplesToolHandler();
 
 // App iframe URLs for app_render events
 const APP_IFRAME_URLS: Record<string, string> = {
   chess: '/apps/chess',
-  spotify: '/apps/spotify',
+  khan: '/apps/khan',
+  flashcards: '/apps/flashcards',
+  firstprinciples: '/apps/firstprinciples',
 };
 
 // Which tool calls should trigger an app_render
 const APP_RENDER_TRIGGERS: Record<string, string[]> = {
   chess: ['start_game'],
-  spotify: ['create_playlist'],
+  khan: ['open_topic'],
+  flashcards: ['load_deck', 'create_deck'],
+  firstprinciples: ['analyze'],
 };
 
 const TOOL_TIMEOUT_MS = 15_000;
@@ -39,23 +45,28 @@ async function executeToolHandler(
   args: Record<string, unknown>,
   sessionId: string,
   userId: string,
-  conversationId: string
+  _conversationId: string
 ): Promise<unknown> {
   const handler = (() => {
     switch (appSlug) {
       case 'chess':
         return chessHandler.handleToolInvoke(sessionId, toolName, args);
-      case 'weather':
-        return weatherHandler.handleToolInvoke(toolName, args);
-      case 'spotify':
-        return spotifyHandler.handleToolInvoke(toolName, { ...args, conversationId }, userId);
+      case 'khan':
+        return khanHandler.handleToolInvoke(sessionId, toolName, args);
+      case 'flashcards':
+        return flashcardsHandler.handleToolInvoke(sessionId, toolName, args, userId);
+      case 'firstprinciples':
+        return firstPrinciplesHandler.handleToolInvoke(sessionId, toolName, args);
       default:
         return Promise.resolve({ error: `No handler for app: ${appSlug}` });
     }
   })();
 
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Tool ${appSlug}__${toolName} timed out after ${TOOL_TIMEOUT_MS / 1000}s`)), TOOL_TIMEOUT_MS)
+    setTimeout(
+      () => reject(new Error(`Tool ${appSlug}__${toolName} timed out after ${TOOL_TIMEOUT_MS / 1000}s`)),
+      TOOL_TIMEOUT_MS
+    )
   );
 
   return Promise.race([handler, timeout]);
@@ -125,11 +136,14 @@ You help students learn by combining conversation with hands-on learning tools. 
 ### Chess (Strategic Thinking)
 A chess tutor that builds problem-solving, pattern recognition, and planning skills. Use chess__start_game to begin a game, chess__make_move to play moves, chess__get_board_state to analyze the position. During games, coach the student — explain tactical ideas, point out patterns, and help them think through consequences of moves.
 
-### Weather (Geography & Earth Science)
-A geography and earth science exploration tool. Use weather__get_weather with a location to help students learn about climate zones, hemispheric seasons, the water cycle, and global geography. Contextualize the data — compare weather across regions, explain why temperatures differ, connect to science concepts.
+### Khan Academy Companion (Topic Exploration)
+A topic companion for exploring any subject. Use khan__open_topic with a topic name to open a lesson view. Use khan__explain_concept with a concept to get a student-friendly explanation. Use khan__quiz to generate a quiz question on the current topic. Guide the student through topics, encourage curiosity, and help them test their understanding.
 
-### Spotify (Focus & Study Skills)
-A study playlist creator that supports focused learning. First check auth with spotify__get_auth_status, then use spotify__create_playlist with name, mood, and optional track_count. Help students understand how music and environment affect concentration. If authentication is needed, provide the auth URL from the tool result.
+### Flashcards (Active Recall Study)
+A flashcard study tool for active recall practice. Use flashcards__create_deck with a title and cards array (each card has front and back) to create a new deck. Use flashcards__load_deck with a deckId to load an existing deck. Use flashcards__answer_card to check answers and flashcards__get_progress to review study history. Help students create effective flashcards and use spaced repetition principles.
+
+### First Principles Tutor (Critical Thinking)
+A critical thinking tool that breaks down questions into first principles. Use firstprinciples__analyze with a question or problem to decompose it into assumptions, foundational principles, and step-by-step reasoning. Help students see the structure behind complex questions and develop analytical thinking skills.
 
 ## Rules
 - Only invoke tools when the student's request clearly matches a tool's purpose.

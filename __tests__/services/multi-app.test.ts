@@ -15,7 +15,7 @@ const appService = new AppService();
 let testUserId: string;
 let testConversationId: string;
 let chessAppId: string;
-let weatherAppId: string;
+let khanAppId: string;
 
 beforeAll(async () => {
   const [user] = await db
@@ -37,15 +37,15 @@ beforeAll(async () => {
   });
   chessAppId = chessApp.id;
 
-  const weatherApp = await appService.register({
-    slug: `weather-multiapp-${Date.now()}`,
-    name: 'Weather',
-    description: 'Weather info',
+  const khanApp = await appService.register({
+    slug: `khan-multiapp-${Date.now()}`,
+    name: 'Khan Academy Companion',
+    description: 'Topic exploration companion',
     authType: 'none',
-    iframeUrl: 'https://weather.example.com',
-    toolSchemas: [{ name: 'get_weather', description: 'Get weather for a location', parameters: {} }],
+    iframeUrl: 'https://khan.example.com',
+    toolSchemas: [{ name: 'open_topic', description: 'Open a topic', parameters: {} }],
   });
-  weatherAppId = weatherApp.id;
+  khanAppId = khanApp.id;
 });
 
 afterAll(async () => {
@@ -54,7 +54,7 @@ afterAll(async () => {
   await db.delete(appSessions).where(eq(appSessions.conversationId, testConversationId));
   await db.delete(conversations).where(eq(conversations.id, testConversationId));
   await db.delete(apps).where(eq(apps.id, chessAppId));
-  await db.delete(apps).where(eq(apps.id, weatherAppId));
+  await db.delete(apps).where(eq(apps.id, khanAppId));
   await db.delete(users).where(eq(users.id, testUserId));
 });
 
@@ -90,29 +90,29 @@ describe('Multi-app switching', () => {
     expect(context).toContain('White wins by checkmate');
   });
 
-  it('switching to weather app after chess works', async () => {
-    const [weatherApp] = await db.select().from(apps).where(eq(apps.id, weatherAppId)).limit(1);
+  it('switching to khan app after chess works', async () => {
+    const [khanApp] = await db.select().from(apps).where(eq(apps.id, khanAppId)).limit(1);
     const result = await toolRouter.invoke({
       conversationId: testConversationId,
-      appSlug: weatherApp.slug,
-      toolName: 'get_weather',
-      toolParams: { location: 'Austin' },
+      appSlug: khanApp.slug,
+      toolName: 'open_topic',
+      toolParams: { topic: 'Fractions' },
       userId: testUserId,
     });
     expect(result.invocationId).toBeDefined();
     expect(result.sessionId).toBeDefined();
   });
 
-  it('chess context_summary still available after switching to weather', async () => {
+  it('chess context_summary still available after switching to khan', async () => {
     const context = await completionService.buildContextWithSummaries(testConversationId);
     expect(context).toContain('White wins by checkmate');
   });
 
   it('refuses invocation for non-existent tool', async () => {
-    const [weatherApp] = await db.select().from(apps).where(eq(apps.id, weatherAppId)).limit(1);
+    const [khanApp] = await db.select().from(apps).where(eq(apps.id, khanAppId)).limit(1);
     const result = await toolRouter.invoke({
       conversationId: testConversationId,
-      appSlug: weatherApp.slug,
+      appSlug: khanApp.slug,
       toolName: 'nonexistent_tool',
       toolParams: {},
       userId: testUserId,

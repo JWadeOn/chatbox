@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ServerMessage, StreamEventToolCall } from '../../src/types/chat';
 import {
   createStreamingAssistantMessage,
   createUserMessage,
@@ -7,7 +8,6 @@ import {
   normalizeServerMessage,
   toolCallEventToMessage,
 } from '../../src/types/chat';
-import type { ServerMessage, StreamEventToolCall } from '../../src/types/chat';
 
 describe('normalizeServerMessage', () => {
   it('converts a user message to ChatMessageViewModel', () => {
@@ -28,7 +28,8 @@ describe('normalizeServerMessage', () => {
     const server: ServerMessage = {
       id: '3',
       role: 'system',
-      content: '[chess] start_game({"color":"white"}) → {"board_fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1","status":"in_progress"}',
+      content:
+        '[chess] start_game({"color":"white"}) → {"board_fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1","status":"in_progress"}',
     };
     const vm = normalizeServerMessage(server);
     expect(vm.role).toBe('tool');
@@ -43,7 +44,7 @@ describe('normalizeServerMessage', () => {
     const server: ServerMessage = {
       id: '4',
       role: 'system',
-      content: '[weather] get_weather({"location":"mars"}) → {"error":"Location not found"}',
+      content: '[khan] open_topic({"topic":"mars"}) → {"error":"No active topic"}',
     };
     const vm = normalizeServerMessage(server);
     const toolParts = getToolCallParts(vm);
@@ -90,8 +91,8 @@ describe('toolCallEventToMessage', () => {
   it('marks error results as error state', () => {
     const event: StreamEventToolCall = {
       type: 'tool_call',
-      appSlug: 'weather',
-      toolName: 'get_weather',
+      appSlug: 'khan',
+      toolName: 'open_topic',
       args: {},
       result: { error: 'API down' },
     };
@@ -137,7 +138,15 @@ describe('getTextContent', () => {
       id: '1',
       role: 'tool' as const,
       contentParts: [
-        { type: 'tool-call' as const, state: 'result' as const, toolCallId: 'tc1', appSlug: 'chess', toolName: 'start', args: {}, result: {} },
+        {
+          type: 'tool-call' as const,
+          state: 'result' as const,
+          toolCallId: 'tc1',
+          appSlug: 'chess',
+          toolName: 'start',
+          args: {},
+          result: {},
+        },
         { type: 'text' as const, text: 'Done' },
       ],
     };

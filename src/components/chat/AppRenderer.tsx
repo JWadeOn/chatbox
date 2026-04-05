@@ -39,17 +39,15 @@ export function AppRenderer({
         : never
     ) => {
       if (iframeRef.current?.contentWindow) {
-        const resolvedUrl = iframeUrl.startsWith('/') ? `${window.location.origin}${iframeUrl}` : iframeUrl;
-        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), new URL(resolvedUrl).origin);
+        // Sandboxed iframes (no allow-same-origin) have origin "null",
+        // so we must use "*" as the target origin for postMessage delivery.
+        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), '*');
       }
     },
-    [iframeUrl]
+    []
   );
 
   useEffect(() => {
-    const resolvedUrl = iframeUrl.startsWith('/') ? `${window.location.origin}${iframeUrl}` : iframeUrl;
-    const origin = new URL(resolvedUrl).origin;
-
     const handlers: PostMessageHandler = {
       onToolResult,
       onAppComplete: (summary, data) => {
@@ -63,13 +61,12 @@ export function AppRenderer({
       onHeartbeat: () => {},
     };
 
-    const isSameDomain = iframeUrl.startsWith('/');
-    const listener = createPostMessageListener(origin, handlers, isSameDomain);
+    // All sandboxed iframes (no allow-same-origin) report origin "null".
+    const listener = createPostMessageListener('null', handlers);
 
     const handleMessage = (event: MessageEvent) => {
-      // Sandboxed iframes without allow-same-origin have origin "null".
-      // Accept "null" for same-domain apps, match resolved origin for external apps.
-      if (event.origin !== origin && !(isSameDomain && event.origin === 'null')) return;
+      // All sandboxed iframes (no allow-same-origin) report origin "null".
+      if (event.origin !== 'null') return;
 
       let data: Record<string, unknown>;
       try {
@@ -101,7 +98,7 @@ export function AppRenderer({
       window.removeEventListener('message', handleMessage);
       bufferRef.current?.destroy();
     };
-  }, [iframeUrl, onToolResult, onAppComplete, onAppError, sendToIframe]);
+  }, [onToolResult, onAppComplete, onAppError, sendToIframe]);
 
   if (error) {
     return <ErrorMessage message={error} onRetry={onClose} />;
@@ -123,13 +120,7 @@ export function AppRenderer({
       <iframe
         ref={iframeRef}
         src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}?sessionId=${sessionId}`}
-        /* Internal apps (same-domain, /apps/*) need allow-same-origin to load
-           their JS/CSS bundles. External third-party apps must NOT get it. */
-        sandbox={
-          iframeUrl.startsWith('/')
-            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
-            : 'allow-scripts allow-forms allow-popups'
-        }
+        sandbox="allow-scripts allow-forms allow-popups"
         referrerPolicy="no-referrer"
         loading="eager"
         title={`${appSlug} app`}

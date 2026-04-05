@@ -17,8 +17,9 @@ import { AppRenderer } from './AppRenderer';
 
 const SUGGESTIONS = [
   { label: "Let's play chess", icon: '\u265E' },
-  { label: "What's the weather in Austin?", icon: '\u2600' },
-  { label: 'Help me study math', icon: '\u03C0' },
+  { label: 'Teach me about photosynthesis', icon: '\u{1F4D6}' },
+  { label: 'Create flashcards for vocabulary', icon: '\u{1F4DD}' },
+  { label: 'Break down: Why is the sky blue?', icon: '\u{1F9E0}' },
 ];
 
 type ChatWindowProps = {

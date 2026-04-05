@@ -28,9 +28,9 @@ describe('recovery prompts', () => {
   });
 
   it('buildTimeoutPrompt includes tool and app name', () => {
-    const prompt = buildTimeoutPrompt('get_weather', 'Weather');
-    expect(prompt).toContain('get_weather');
-    expect(prompt).toContain('Weather');
+    const prompt = buildTimeoutPrompt('open_topic', 'Khan Academy Companion');
+    expect(prompt).toContain('open_topic');
+    expect(prompt).toContain('Khan Academy Companion');
     expect(prompt).toContain('timed out');
     expect(prompt).toContain('15');
   });

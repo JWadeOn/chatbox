@@ -142,14 +142,9 @@ export class OAuthService {
 
   private getOAuthConfig(appSlug: string): OAuthConfig {
     // Default configs for known apps. In production, these come from the apps table.
-    const configs: Record<string, OAuthConfig> = {
-      spotify: {
-        authorizationUrl: 'https://accounts.spotify.com/authorize',
-        tokenUrl: 'https://accounts.spotify.com/api/token',
-        scopes: ['playlist-modify-public', 'playlist-modify-private'],
-        clientId: process.env.SPOTIFY_CLIENT_ID || 'mock-client-id',
-      },
-    };
+    // No hardcoded OAuth configs in MVP — apps use platform auth.
+    // When external OAuth is added post-MVP, register configs here.
+    const configs: Record<string, OAuthConfig> = {};
 
     return (
       configs[appSlug] ?? {

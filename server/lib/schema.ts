@@ -145,3 +145,41 @@ export const intents = pgTable(
     index('idx_intents_conversation_status').on(table.conversationId, table.status),
   ]
 );
+
+// 2.9 Study Decks (Flashcards app)
+export const studyDecks = pgTable(
+  'study_decks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 255 }).notNull(),
+    description: text('description'),
+    cards: jsonb('cards').default([]).notNull(),
+    cardCount: integer('card_count').default(0).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_study_decks_user').on(table.userId)]
+);
+
+// 2.10 Study Progress (Flashcards app)
+export const studyProgress = pgTable(
+  'study_progress',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deckId: uuid('deck_id')
+      .notNull()
+      .references(() => studyDecks.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').references(() => appSessions.id),
+    cardsSeen: integer('cards_seen').default(0).notNull(),
+    cardsCorrect: integer('cards_correct').default(0).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_study_progress_user').on(table.userId), index('idx_study_progress_deck').on(table.deckId)]
+);

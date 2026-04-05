@@ -1,5 +1,5 @@
-import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import next from 'next';
 import { pool } from './lib/db';
@@ -62,7 +62,7 @@ app.prepare().then(() => {
       return;
     }
 
-    // API routes, Next.js app pages (chess/spotify), and Next.js internals → Next.js
+    // API routes, Next.js app pages, and Next.js internals → Next.js
     if (
       pathname.startsWith('/api/') ||
       pathname.startsWith('/apps/') ||

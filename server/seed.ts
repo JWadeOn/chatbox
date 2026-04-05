@@ -19,7 +19,8 @@ const CHESS_APP = {
   toolSchemas: [
     {
       name: 'start_game',
-      description: 'Start a chess lesson. The student plays against the board while the tutor coaches them through moves.',
+      description:
+        'Start a chess lesson. The student plays against the board while the tutor coaches them through moves.',
       parameters: {
         type: 'object',
         properties: {
@@ -51,63 +52,134 @@ const CHESS_APP = {
   ],
 };
 
-const WEATHER_APP = {
-  slug: 'weather',
-  name: 'Weather Explorer',
-  description: 'Geography and earth science tool for exploring climate, weather patterns, and global locations',
+const KHAN_APP = {
+  slug: 'khan',
+  name: 'Khan Academy Companion',
+  description:
+    'Topic exploration companion for any subject — opens lessons, explains concepts, and generates quiz questions',
   authType: 'none',
-  iframeUrl: '/apps/weather',
+  iframeUrl: '/apps/khan',
   toolSchemas: [
     {
-      name: 'get_weather',
-      description: 'Look up weather for a location to explore geography, climate zones, and seasonal patterns.',
+      name: 'open_topic',
+      description: 'Open a topic or lesson for the student to explore and learn about.',
       parameters: {
         type: 'object',
         properties: {
-          location: { type: 'string', description: 'City name or location (e.g. "San Francisco, CA")' },
+          topic: { type: 'string', description: 'The topic or lesson to open (e.g. "Photosynthesis", "Fractions")' },
         },
-        required: ['location'],
+        required: ['topic'],
+      },
+    },
+    {
+      name: 'explain_concept',
+      description: 'Explain a concept in clear, student-friendly terms within the current topic.',
+      parameters: {
+        type: 'object',
+        properties: {
+          concept: { type: 'string', description: 'The specific concept to explain' },
+        },
+        required: ['concept'],
+      },
+    },
+    {
+      name: 'quiz',
+      description: 'Generate a quiz question on the current topic to test student understanding.',
+      parameters: { type: 'object', properties: {} },
+    },
+  ],
+};
+
+const FLASHCARDS_APP = {
+  slug: 'flashcards',
+  name: 'Flashcards',
+  description: 'Create and study flashcard decks for active recall practice with progress tracking',
+  authType: 'none',
+  iframeUrl: '/apps/flashcards',
+  toolSchemas: [
+    {
+      name: 'load_deck',
+      description: 'Load a flashcard deck by ID for the current user to study.',
+      parameters: {
+        type: 'object',
+        properties: {
+          deckId: { type: 'string', description: 'The deck UUID to load' },
+        },
+        required: ['deckId'],
+      },
+    },
+    {
+      name: 'create_deck',
+      description: 'Create a new flashcard deck with a title and array of cards.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Title for the deck' },
+          cards: {
+            type: 'array',
+            description: 'Array of card objects with front and back text',
+            items: {
+              type: 'object',
+              properties: {
+                front: { type: 'string', description: 'Front of card (question/term)' },
+                back: { type: 'string', description: 'Back of card (answer/definition)' },
+              },
+              required: ['front', 'back'],
+            },
+          },
+        },
+        required: ['title', 'cards'],
+      },
+    },
+    {
+      name: 'answer_card',
+      description: 'Submit an answer for the current flashcard and check correctness.',
+      parameters: {
+        type: 'object',
+        properties: {
+          deckId: { type: 'string', description: 'The deck UUID' },
+          cardIndex: { type: 'number', description: 'Index of the card being answered' },
+          answer: { type: 'string', description: 'The student answer' },
+        },
+        required: ['deckId', 'cardIndex', 'answer'],
+      },
+    },
+    {
+      name: 'get_progress',
+      description: 'Get study progress history for a flashcard deck.',
+      parameters: {
+        type: 'object',
+        properties: {
+          deckId: { type: 'string', description: 'The deck UUID' },
+        },
+        required: ['deckId'],
       },
     },
   ],
 };
 
-const SPOTIFY_APP = {
-  slug: 'spotify',
-  name: 'Study Playlist',
-  description: 'Create focus and study playlists to support concentration and learning. Teaches digital literacy through OAuth.',
-  authType: 'oauth2',
-  iframeUrl: '/apps/spotify',
-  oauthConfig: {
-    authorizationUrl: 'https://accounts.spotify.com/authorize',
-    tokenUrl: 'https://accounts.spotify.com/api/token',
-    scopes: ['playlist-modify-public', 'playlist-modify-private'],
-  },
+const FIRST_PRINCIPLES_APP = {
+  slug: 'firstprinciples',
+  name: 'First Principles Tutor',
+  description: 'Breaks down questions into assumptions, first principles, and step-by-step reasoning',
+  authType: 'none',
+  iframeUrl: '/apps/firstprinciples',
   toolSchemas: [
     {
-      name: 'get_auth_status',
-      description: 'Check Spotify connection status. The auth flow teaches digital literacy and account permissions.',
-      parameters: { type: 'object', properties: {} },
-    },
-    {
-      name: 'create_playlist',
-      description: 'Create a study playlist matching a mood to support focused learning and self-regulation skills.',
+      name: 'analyze',
+      description: 'Take a question or problem and break it into first principles, assumptions, and reasoning steps.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Name for the playlist' },
-          mood: {
-            type: 'string',
-            enum: ['relaxed', 'energetic', 'focused'],
-            description: 'Mood of the playlist (relaxed, energetic, or focused)',
-          },
-          track_count: { type: 'number', description: 'Number of tracks (default: 10)' },
+          question: { type: 'string', description: 'The question or problem to analyze' },
         },
-        required: ['name', 'mood'],
+        required: ['question'],
       },
     },
   ],
 };
+
+const ALL_APPS = [CHESS_APP, KHAN_APP, FLASHCARDS_APP, FIRST_PRINCIPLES_APP];
 
 async function seed() {
   // Seed demo user
@@ -126,34 +198,25 @@ async function seed() {
     console.info('Demo user created: demo@chatbridge.com / demo1234');
   }
 
-  // Seed chess app
-  console.info('Seeding chess app...');
-  const existingChess = await db.select().from(apps).where(eq(apps.slug, 'chess')).limit(1);
-  if (existingChess.length > 0) {
-    console.info('Chess app already exists, skipping.');
-  } else {
-    await db.insert(apps).values(CHESS_APP);
-    console.info('Chess app registered.');
+  // Deactivate old apps that are no longer in the spec
+  for (const slug of ['weather', 'spotify']) {
+    const [old] = await db.select().from(apps).where(eq(apps.slug, slug)).limit(1);
+    if (old && old.status === 'active') {
+      await db.update(apps).set({ status: 'inactive' }).where(eq(apps.id, old.id));
+      console.info(`Deactivated old app: ${slug}`);
+    }
   }
 
-  // Seed weather app
-  console.info('Seeding weather app...');
-  const existingWeather = await db.select().from(apps).where(eq(apps.slug, 'weather')).limit(1);
-  if (existingWeather.length > 0) {
-    console.info('Weather app already exists, skipping.');
-  } else {
-    await db.insert(apps).values(WEATHER_APP);
-    console.info('Weather app registered.');
-  }
-
-  // Seed spotify app
-  console.info('Seeding spotify app...');
-  const existingSpotify = await db.select().from(apps).where(eq(apps.slug, 'spotify')).limit(1);
-  if (existingSpotify.length > 0) {
-    console.info('Spotify app already exists, skipping.');
-  } else {
-    await db.insert(apps).values(SPOTIFY_APP);
-    console.info('Spotify app registered.');
+  // Seed apps
+  for (const app of ALL_APPS) {
+    console.info(`Seeding ${app.slug} app...`);
+    const [existing] = await db.select().from(apps).where(eq(apps.slug, app.slug)).limit(1);
+    if (existing) {
+      console.info(`${app.slug} app already exists, skipping.`);
+    } else {
+      await db.insert(apps).values(app);
+      console.info(`${app.slug} app registered.`);
+    }
   }
 
   await pool.end();
