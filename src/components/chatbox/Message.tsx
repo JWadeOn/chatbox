@@ -105,38 +105,42 @@ function ToolCallPartView({ part }: { part: MessageToolCallPart }) {
 
   return (
     <div
-      className={`overflow-hidden rounded-lg border text-xs ${
-        isError ? 'border-red-200 bg-red-50' : 'border-indigo-100 bg-indigo-50'
+      className={`overflow-hidden rounded-[1.25rem] border text-xs shadow-[0_10px_24px_rgba(19,34,56,0.08)] ${
+        isError
+          ? 'border-red-200 bg-[rgba(255,245,244,0.92)]'
+          : 'border-[rgba(15,139,141,0.12)] bg-[rgba(246,252,252,0.92)]'
       }`}
     >
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
-          isError ? 'hover:bg-red-100' : 'hover:bg-indigo-100'
+        className={`flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors ${
+          isError ? 'hover:bg-red-100/80' : 'hover:bg-[rgba(15,139,141,0.08)]'
         }`}
       >
-        <span className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-wider ${isError ? 'text-red-600' : 'text-indigo-600'}`}>
+        <span
+          className={`flex-shrink-0 font-mono text-[10px] uppercase tracking-wider ${isError ? 'text-red-600' : 'text-[#0f8b8d]'}`}
+        >
           {part.appSlug}
         </span>
-        <span className={`flex-1 truncate ${isError ? 'text-red-700' : 'text-gray-700'}`}>{summary}</span>
+        <span className={`flex-1 truncate ${isError ? 'text-red-700' : 'text-[#314357]'}`}>{summary}</span>
         {part.state === 'call' && (
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0f8b8d]" />
         )}
-        <span className={`flex-shrink-0 text-[10px] ${isError ? 'text-red-400' : 'text-indigo-400'}`}>
+        <span className={`flex-shrink-0 text-[10px] ${isError ? 'text-red-400' : 'text-[#0f8b8d]/60'}`}>
           {expanded ? '−' : '+'}
         </span>
       </button>
 
       {/* Inline action buttons for known link patterns */}
       {!expanded && !isError && (gameUrl || challengeUrl) && (
-        <div className="flex gap-2 border-t border-indigo-100 px-3 py-1.5">
+        <div className="flex gap-2 border-t border-[rgba(15,139,141,0.1)] px-3 py-2">
           {gameUrl && (
             <a
               href={gameUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center rounded bg-indigo-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-indigo-700"
+              className="inline-flex items-center rounded-full bg-[#132238] px-3 py-1 text-[11px] font-medium text-white hover:bg-[#0d1a2b]"
             >
               Open on Lichess
             </a>
@@ -145,7 +149,7 @@ function ToolCallPartView({ part }: { part: MessageToolCallPart }) {
             <button
               type="button"
               onClick={() => navigator.clipboard.writeText(challengeUrl)}
-              className="inline-flex items-center rounded border border-indigo-300 bg-white px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50"
+              className="inline-flex items-center rounded-full border border-[rgba(15,139,141,0.2)] bg-white px-3 py-1 text-[11px] font-medium text-[#0f8b8d] hover:bg-[rgba(15,139,141,0.06)]"
             >
               Copy challenge link
             </button>
@@ -154,8 +158,8 @@ function ToolCallPartView({ part }: { part: MessageToolCallPart }) {
       )}
 
       {expanded && (
-        <div className="border-t border-indigo-100 px-3 py-2">
-          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-gray-600">
+        <div className="border-t border-[rgba(15,139,141,0.1)] px-3 py-2">
+          <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-[#607186]">
             {JSON.stringify(parsedResult, null, 2)}
           </pre>
         </div>
@@ -180,7 +184,7 @@ function MessageComponent({ message }: MessageProps) {
     const toolParts = getToolCallParts(message);
     if (toolParts.length > 0) {
       return (
-        <div className="mx-auto max-w-2xl space-y-2">
+        <div className="mx-auto max-w-3xl space-y-2">
           {toolParts.map((part) => (
             <ToolCallPartView key={part.toolCallId} part={part} />
           ))}
@@ -193,7 +197,7 @@ function MessageComponent({ message }: MessageProps) {
   if (role === 'system') {
     const text = getTextContent(message);
     return (
-      <div className="mx-auto max-w-lg rounded-md bg-gray-100 px-3 py-1.5 text-center text-xs text-gray-500 italic">
+      <div className="mx-auto max-w-xl rounded-full border border-[rgba(19,34,56,0.08)] bg-white/70 px-4 py-2 text-center text-xs italic text-[rgba(96,113,134,0.86)] backdrop-blur">
         {text}
       </div>
     );
@@ -204,8 +208,11 @@ function MessageComponent({ message }: MessageProps) {
     const text = getTextContent(message);
     return (
       <div className="flex justify-end">
-        <div className="max-w-[75%] rounded-2xl bg-blue-600 px-4 py-2.5 text-sm leading-relaxed text-white">
-          {text}
+        <div className="max-w-[80%] space-y-2">
+          <p className="text-right text-xs font-medium uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">You</p>
+          <div className="rounded-[1.75rem] rounded-tr-md bg-[linear-gradient(135deg,#132238,#0f8b8d)] px-5 py-3 text-sm leading-7 text-white shadow-[0_18px_40px_rgba(19,34,56,0.18)]">
+            {text}
+          </div>
         </div>
       </div>
     );
@@ -217,24 +224,33 @@ function MessageComponent({ message }: MessageProps) {
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[75%] space-y-2">
+      <div className="max-w-[80%] space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[rgba(15,139,141,0.12)] text-sm font-semibold text-[#0f8b8d]">
+            CB
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#132238]">ChatBridge</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.72)]">Assistant</p>
+          </div>
+        </div>
+
         {/* Tool call parts inline with assistant response */}
         {toolParts.map((part) => (
           <ToolCallPartView key={part.toolCallId} part={part} />
         ))}
 
-        {/* Text content rendered as markdown */}
         {(text || generating) && (
-          <div className="prose prose-sm rounded-2xl bg-gray-100 px-4 py-2.5 text-gray-900">
+          <div className="prose prose-sm max-w-none rounded-[1.75rem] rounded-tl-md border border-white/80 bg-[rgba(255,252,247,0.9)] px-5 py-4 text-[#132238] shadow-[0_14px_36px_rgba(19,34,56,0.08)] backdrop-blur">
             {text ? (
               <Markdown uniqueId={message.id} generating={generating}>
                 {text}
               </Markdown>
             ) : generating ? (
-              <span className="inline-flex items-center gap-1 text-gray-400">
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
-                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
+              <span className="inline-flex items-center gap-1 text-[rgba(96,113,134,0.78)]">
+                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[#0f8b8d]" style={{ animationDelay: '0ms' }} />
+                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[#0f8b8d]" style={{ animationDelay: '150ms' }} />
+                <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[#0f8b8d]" style={{ animationDelay: '300ms' }} />
               </span>
             ) : null}
           </div>

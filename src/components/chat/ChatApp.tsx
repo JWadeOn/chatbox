@@ -31,22 +31,49 @@ export function ChatApp() {
   }, [token]);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       <SessionList activeId={activeConversationId} onSelect={setActiveConversationId} onNew={handleNew} />
-      <main className="flex-1">
+      <main className="relative flex-1 overflow-hidden">
         {activeConversationId && token ? (
           <ChatWindow conversationId={activeConversationId} token={token} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <h2 className="text-2xl font-semibold text-gray-800">ChatBridge</h2>
-            <p className="mt-2 text-sm text-gray-500">Start a new conversation or select one from the sidebar</p>
-            <button
-              type="button"
-              onClick={handleNew}
-              className="mt-4 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              New Chat
-            </button>
+          <div className="relative flex h-full items-center justify-center overflow-hidden p-6 sm:p-10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,139,141,0.16),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(224,149,104,0.16),transparent_24%)]" />
+            <div className="relative w-full max-w-3xl rounded-[2rem] border border-white/70 bg-[rgba(255,252,247,0.68)] p-8 text-center shadow-[0_24px_70px_rgba(19,34,56,0.14)] backdrop-blur-xl sm:p-12">
+              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[rgba(19,34,56,0.08)] bg-white/70 px-4 py-1.5 text-xs uppercase tracking-[0.28em] text-[rgba(96,113,134,0.88)]">
+                Learning workspace
+              </div>
+              <h2 className="mt-6 text-4xl font-semibold tracking-tight text-[#132238] sm:text-5xl">
+                Chat that feels like a focused studio.
+              </h2>
+              <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[rgba(96,113,134,0.96)] sm:text-base">
+                Start a fresh conversation, revisit an old one, or use app-powered workflows without leaving the thread.
+              </p>
+
+              <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
+                <div className="rounded-[1.5rem] border border-[rgba(19,34,56,0.08)] bg-white/75 p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">Chat</p>
+                  <p className="mt-2 text-sm font-medium text-[#132238]">Fast prompts and cleaner message flow.</p>
+                </div>
+                <div className="rounded-[1.5rem] border border-[rgba(19,34,56,0.08)] bg-white/75 p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">Apps</p>
+                  <p className="mt-2 text-sm font-medium text-[#132238]">Open tools in-context when a task needs more than text.</p>
+                </div>
+                <div className="rounded-[1.5rem] border border-[rgba(19,34,56,0.08)] bg-white/75 p-4">
+                  <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">Continuity</p>
+                  <p className="mt-2 text-sm font-medium text-[#132238]">Keep conversations organized and easy to resume.</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNew}
+                className="mt-10 inline-flex items-center gap-2 rounded-full bg-[#132238] px-6 py-3 text-sm font-medium text-white shadow-[0_16px_36px_rgba(19,34,56,0.2)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#0d1a2b]"
+              >
+                <span className="text-base leading-none">+</span>
+                <span>Start a new chat</span>
+              </button>
+            </div>
           </div>
         )}
       </main>

@@ -1,1 +1,47 @@
 @import "tailwindcss";
+
+:root {
+  --chatbridge-ink: #132238;
+  --chatbridge-muted: #607186;
+  --chatbridge-accent: #0f8b8d;
+  --chatbridge-accent-strong: #0c6b6c;
+  --chatbridge-warm: #f6f1e8;
+  --chatbridge-panel: rgba(255, 252, 247, 0.78);
+  --chatbridge-panel-strong: rgba(255, 252, 247, 0.92);
+  --chatbridge-border: rgba(19, 34, 56, 0.1);
+  --chatbridge-sidebar: #122033;
+  --chatbridge-sidebar-muted: rgba(214, 225, 241, 0.72);
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(15, 139, 141, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(222, 140, 90, 0.12), transparent 28%),
+    linear-gradient(180deg, #f8f4ec 0%, #f2ede4 100%);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--chatbridge-ink);
+  background:
+    radial-gradient(circle at top left, rgba(15, 139, 141, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(222, 140, 90, 0.12), transparent 26%);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(19, 34, 56, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 34, 56, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
+  opacity: 0.3;
+}
+
+::selection {
+  color: white;
+  background: rgba(15, 139, 141, 0.85);
+}
