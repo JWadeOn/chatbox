@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../lib/db';
 import { logEvent } from '../lib/logger';
 import { appSessions, apps } from '../lib/schema';
+import { sanitizeDescription } from '../lib/schema-sanitizer';
 import { IntentService } from './intent.service';
 
 export class CompletionService {
@@ -34,7 +35,7 @@ export class CompletionService {
 
     // Update session to completed with context_summary
     const contextSummary = {
-      human_summary: summary,
+      human_summary: sanitizeDescription(summary),
       data,
     };
 
@@ -53,7 +54,7 @@ export class CompletionService {
       await this.intentService.resolveIntent(activeIntent.id);
     }
 
-    logEvent({ event: 'app_complete', sessionId, conversationId: session.conversationId }, { summary });
+    logEvent({ event: 'app_session_completed', sessionId, conversationId: session.conversationId }, { summary });
 
     return { processed: true };
   }
@@ -88,7 +89,7 @@ export class CompletionService {
       await this.intentService.abandonIntent(activeIntent.id);
     }
 
-    logEvent({ event: 'session_timeout', sessionId, conversationId: session.conversationId });
+    logEvent({ event: 'app_session_timed_out', sessionId, conversationId: session.conversationId });
   }
 
   /**

@@ -93,7 +93,7 @@ export class ToolRouter {
 
     logEvent(
       {
-        event: 'tool_invoked',
+        event: 'tool_invocation_requested',
         invocationId: toolLog.invocationId,
         sessionId,
         conversationId,
@@ -125,7 +125,7 @@ export class ToolRouter {
     this.invocationTimestamps.delete(invocationId);
     this.circuitBreaker.recordSuccess();
 
-    logEvent({ event: 'tool_result_received', invocationId }, { durationMs });
+    logEvent({ event: 'tool_invocation_succeeded', invocationId }, { durationMs });
   }
 
   async handleTimeout(invocationId: string): Promise<void> {
@@ -153,7 +153,7 @@ export class ToolRouter {
       }
     }
 
-    logEvent({ event: 'tool_timeout', invocationId }, { durationMs });
+    logEvent({ event: 'tool_invocation_timed_out', invocationId }, { durationMs });
   }
 
   async handleAppComplete(sessionId: string, summary: ContextSummary): Promise<void> {
@@ -161,7 +161,7 @@ export class ToolRouter {
     const [session] = await db.select().from(appSessions).where(eq(appSessions.id, sessionId));
 
     if (!session || session.status === 'completed') {
-      logEvent({ event: 'app_complete_ignored', sessionId }, { reason: 'session already completed or not found' });
+      logEvent({ event: 'app_session_completed_ignored', sessionId }, { reason: 'session already completed or not found' });
       return;
     }
 
@@ -181,7 +181,7 @@ export class ToolRouter {
       await this.intentService.resolveIntent(activeIntent.id);
     }
 
-    logEvent({ event: 'app_complete', sessionId }, { app: summary.app });
+    logEvent({ event: 'app_session_completed', sessionId }, { app: summary.app });
   }
 
   private async ensureSession(conversationId: string, appId: string): Promise<string> {
@@ -204,7 +204,7 @@ export class ToolRouter {
         .where(eq(appSessions.id, existingSession.id));
 
       logEvent(
-        { event: 'session_terminated', sessionId: existingSession.id, conversationId },
+        { event: 'app_session_terminated', sessionId: existingSession.id, conversationId },
         { reason: 'new app invocation' }
       );
     }
@@ -218,6 +218,11 @@ export class ToolRouter {
         status: 'active',
       })
       .returning();
+
+    logEvent(
+      { event: 'app_session_started', sessionId: newSession.id, conversationId },
+      { appId }
+    );
 
     return newSession.id;
   }

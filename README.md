@@ -126,19 +126,24 @@ See `docs/TECHNICAL_PRESEARCH.md` for the full analysis. Here's what we built an
 All apps are framed through an educational lens for the K-12 case study. See `docs/TECHNICAL_PRESEARCH.md` for the full rationale.
 
 ### Chess (Strategic Thinking)
-Chess tutor that builds problem-solving, pattern recognition, and planning skills. The LLM coaches students during games -- analyzing positions, explaining tactics, and helping them think through consequences. The board renders in a sandboxed iframe with local move validation via chess.js.
+Chess tutor that builds problem-solving, pattern recognition, and planning skills. The LLM coaches students during games -- analyzing positions, explaining tactics, and helping them think through consequences. The board renders in a sandboxed iframe with local move validation via chess.js. Supports three modes: tutoring (local board), vs Computer, and vs Human (both via Lichess integration).
 
 **Tools:** `chess__start_game`, `chess__make_move`, `chess__get_board_state`, `chess__resign`
 
-### Weather Explorer (Geography & Earth Science)
-Geography and earth science exploration tool. Students look up weather in different cities to learn about climate zones, hemispheric seasons, and global geography. The chatbot contextualizes the data educationally.
+### Khan Academy Companion (Topic Exploration)
+Non-authenticated educational companion for guided topic exploration. Students open a topic from chat, receive concept explanations, take quiz questions, and track learning stats. All state is session-only -- no durable per-user auth required.
 
-**Tools:** `weather__get_weather`
+**Tools:** `khan__open_topic`, `khan__explain_concept`, `khan__quiz`
 
-### Study Playlist / Spotify (Focus & Study Skills)
-OAuth2-authenticated study playlist creator. Students create mood-based playlists to support focused learning. The OAuth flow doubles as a digital literacy lesson about account permissions and data sharing.
+### Flashcards (Active Recall Study)
+Platform-authenticated study app with user-specific decks and progress tracking. Students create decks from chat, work through cards in the iframe with flip/score mechanics, and track mastery over time. Auth is platform-owned (JWT) -- no external OAuth in MVP. User-specific data is gated by authenticated identity.
 
-**Tools:** `spotify__get_auth_status`, `spotify__create_playlist`
+**Tools:** `flashcards__create_deck`, `flashcards__load_deck`, `flashcards__answer_card`, `flashcards__get_progress`
+
+### First Principles Tutor (Critical Thinking) -- Bonus
+Structured reasoning tool that decomposes questions into assumptions, first principles, reasoning steps, and conclusions. Students submit a question and receive a structured analysis they can discuss with the chatbot afterward.
+
+**Tools:** `firstprinciples__analyze`
 
 ## API Reference
 
@@ -281,8 +286,6 @@ Deployed on **Railway** with Docker. The `railway.toml` and `Dockerfile` are inc
 - `PORT` -- server port (default: `3000`)
 - `DB_POOL_MAX` -- database connection pool size (default: `20`)
 - `LOG_LEVEL` -- pino log level (default: `info`)
-- `WEATHER_API_KEY` -- for weather app
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` -- for Spotify OAuth app
 
 After deploying, run against the production database:
 ```bash

@@ -4,6 +4,7 @@ import { ChessToolHandler } from '../../../../server/apps/chess';
 import { FirstPrinciplesToolHandler } from '../../../../server/apps/firstprinciples';
 import { FlashcardsToolHandler } from '../../../../server/apps/flashcards';
 import { KhanToolHandler } from '../../../../server/apps/khan';
+import { logEvent } from '../../../../server/lib/logger';
 import { toolRateLimiter } from '../../../../server/lib/rate-limiter';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
 import { buildActiveAppContextForConversation } from '../../../../server/services/active-app-context.service';
@@ -238,12 +239,20 @@ A critical thinking tool that breaks down questions into first principles. Use f
               const sessionId = routeResult.sessionId ?? '';
 
               // 2. Execute the actual tool handler (with 15s timeout)
+              logEvent(
+                { event: 'tool_invocation_dispatched', invocationId: invocationId ?? undefined, sessionId, conversationId },
+                { appSlug, toolName }
+              );
               let result: unknown;
               try {
                 result = await executeToolHandler(appSlug, toolName, args, sessionId, userId, conversationId);
               } catch (toolErr) {
                 const errMsg = toolErr instanceof Error ? toolErr.message : 'Tool execution failed';
                 result = { error: errMsg };
+                logEvent(
+                  { event: 'tool_invocation_failed', invocationId: invocationId ?? undefined, conversationId },
+                  { appSlug, toolName, error: errMsg }
+                );
                 if (invocationId) {
                   await toolRouter.handleTimeout(invocationId);
                 }

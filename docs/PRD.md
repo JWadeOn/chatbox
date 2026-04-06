@@ -323,10 +323,11 @@ The next defensible moat is orchestration: letting the chatbot invoke third-part
 - App state independence from chat state, with a contextual bridge for merging results back into conversation
 - Context retention — chatbot remembers app results in subsequent turns
 
-**Required applications (3 minimum):**
+**Required applications (3 minimum, final lineup):**
 - Chess (required) — high complexity, ongoing state, bidirectional communication, interactive board with legal move validation
-- One app requiring OAuth2 user authentication (e.g., Spotify playlist creator)
-- One public/internal app with no user auth (e.g., weather dashboard, calculator)
+- Flashcards (platform-authenticated) — user-specific decks and progress tied to platform identity, no external OAuth in MVP
+- Khan Academy Companion (no auth) — guided topic exploration with concept explanations and quizzes, session-only state
+- First Principles Tutor (bonus) — structured reasoning decomposition tool
 
 **Authentication architecture spanning three app types:**
 - Internal (no auth) — bundled with platform
@@ -363,10 +364,10 @@ The next defensible moat is orchestration: letting the chatbot invoke third-part
 > When the chess game ends, the conversation continues naturally — the chatbot discusses the game and I can ask follow-up questions about what happened.
 
 **US-4: Switch between apps**
-> I finish a chess game and say "now show me the weather in Austin" — the chatbot routes to the weather app without confusion.
+> I finish a chess game and say "let's explore photosynthesis" — the chatbot routes to the Khan Companion without confusion.
 
-**US-5: Authenticate with an external service**
-> I say "make me a study playlist on Spotify" — the platform walks me through OAuth login, then the app creates the playlist inside the chat.
+**US-5: Use an authenticated app**
+> I say "create a flashcard deck for vocabulary" — the platform uses my authenticated identity to create a personal deck, and I study cards in the iframe.
 
 ### Chatbot Behavior
 

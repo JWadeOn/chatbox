@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { sanitizeDescription } from '../../../../server/lib/schema-sanitizer';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
 import { toolRouter } from '../../../../server/services/tool-router.service';
 
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     await toolRouter.handleAppComplete(sessionId, {
       app: data?.appSlug || 'unknown',
-      human_summary: summary,
+      human_summary: sanitizeDescription(summary),
       key_results: data || {},
     });
 
