@@ -321,8 +321,8 @@ export default function ChessApp() {
 
   const displayBoard = flipped ? [...board].reverse().map((row) => [...row].reverse()) : board;
 
-  // Lichess mode — play happens on lichess.org, not inside this iframe.
-  if (mode !== 'tutoring') {
+  // Lichess modes — play happens on lichess.org, not inside this iframe.
+  if (mode === 'vs_computer' || mode === 'vs_human') {
     return (
       <div
         style={{

@@ -27,6 +27,9 @@ function buildSummary(appSlug: string, toolName: string, result: Record<string, 
   if (appSlug === 'chess') {
     if (toolName === 'start_game') {
       const mode = result.mode as string | undefined;
+      if (mode === 'local_computer') {
+        return `Started local computer game — playing as ${result.player_color ?? 'white'}`;
+      }
       if (mode === 'vs_computer') {
         return `Started game vs Stockfish (level ${result.level ?? '?'})`;
       }
