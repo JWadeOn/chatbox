@@ -43,6 +43,25 @@ const APP_RENDER_TRIGGERS: Record<string, string[]> = {
 
 const TOOL_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 60_000;
+const STUDY_PLANNER_INTENT_RE =
+  /\b(study schedule|study session|plan my study|plan .*study|calendar|time block|time-block|schedule my|schedule .*session)\b/i;
+
+function forceStudyPlannerRouting(
+  userContent: string,
+  appSlug: string,
+  toolName: string,
+  args: Record<string, unknown>
+): { appSlug: string; toolName: string; args: Record<string, unknown> } {
+  const likelyPlannerIntent = STUDY_PLANNER_INTENT_RE.test(userContent);
+  if (!likelyPlannerIntent) {
+    return { appSlug, toolName, args };
+  }
+  if (appSlug === 'studyplanner') {
+    return { appSlug, toolName, args };
+  }
+  // Force auth-first path for scheduling intents so users always get OAuth handoff.
+  return { appSlug: 'studyplanner', toolName: 'open_planner', args: {} };
+}
 
 /** Execute the actual tool handler with a 15s timeout. */
 async function executeToolHandler(
@@ -199,8 +218,12 @@ An external authenticated app for planning study time in Google Calendar. Use st
             for (const tc of toolCalls) {
               if (tc.type !== 'function') continue;
 
-              const [appSlug, toolName] = tc.function.name.split('__');
-              const args = JSON.parse(tc.function.arguments || '{}');
+              const [rawAppSlug, rawToolName] = tc.function.name.split('__');
+              const rawArgs = JSON.parse(tc.function.arguments || '{}');
+              const routed = forceStudyPlannerRouting(content, rawAppSlug, rawToolName, rawArgs);
+              const appSlug = routed.appSlug;
+              const toolName = routed.toolName;
+              const args = routed.args;
 
               // 0. Rate limit check (10 tool invocations/min/user)
               const rateCheck = toolRateLimiter.check(userId);
