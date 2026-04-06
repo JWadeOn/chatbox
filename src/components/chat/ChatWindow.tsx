@@ -14,6 +14,7 @@ import { Message } from '@/components/chatbox/Message';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { useChat } from '@/lib/use-chat';
 import { AppRenderer } from './AppRenderer';
+import { IconChevronRight } from './SidebarToggleIcons';
 
 const SUGGESTIONS = [
   { label: "Let's play chess", icon: '\u265E' },
@@ -25,9 +26,11 @@ const SUGGESTIONS = [
 type ChatWindowProps = {
   conversationId: string;
   token: string;
+  /** Shown when the conversation list sidebar is hidden so the user can open it again. */
+  onExpandConversationList?: () => void;
 };
 
-export function ChatWindow({ conversationId, token }: ChatWindowProps) {
+export function ChatWindow({ conversationId, token, onExpandConversationList }: ChatWindowProps) {
   const { messages, streaming, appEmbed, error, sendMessage, closeApp, handleAppComplete, handleAppError } = useChat({
     conversationId,
     token,
@@ -43,9 +46,22 @@ export function ChatWindow({ conversationId, token }: ChatWindowProps) {
     <div className="flex h-full flex-col">
       <div className="border-b border-[rgba(19,34,56,0.08)] bg-[rgba(255,252,247,0.62)] px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-[rgba(96,113,134,0.82)]">Active workspace</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-[#132238]">ChatBridge Studio</h2>
+          <div className="flex min-w-0 items-center gap-3">
+            {onExpandConversationList && (
+              <button
+                type="button"
+                onClick={onExpandConversationList}
+                title="Show conversation list"
+                aria-label="Show conversation list"
+                className="shrink-0 rounded-xl border border-[rgba(19,34,56,0.12)] bg-white/80 p-2 text-[#132238] shadow-sm transition hover:border-[rgba(15,139,141,0.35)] hover:bg-white"
+              >
+                <IconChevronRight className="block" />
+              </button>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-[0.24em] text-[rgba(96,113,134,0.82)]">Active workspace</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-[#132238]">ChatBridge Studio</h2>
+            </div>
           </div>
           <div className="rounded-full border border-[rgba(19,34,56,0.08)] bg-white/75 px-3 py-1.5 text-xs font-medium text-[rgba(96,113,134,0.92)]">
             Conversation ready

@@ -16,6 +16,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { IconChevronLeft } from '@/components/chat/SidebarToggleIcons';
 import { useAuth } from '@/lib/auth-context';
 
 const OPERATOR_ROLES = new Set(['admin', 'teacher']);
@@ -30,9 +31,11 @@ type SessionListProps = {
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  /** When set, shows a control to hide the sidebar and give the chat column full width. */
+  onRequestCollapse?: () => void;
 };
 
-export function SessionList({ activeId, onSelect, onNew }: SessionListProps) {
+export function SessionList({ activeId, onSelect, onNew, onRequestCollapse }: SessionListProps) {
   const { token, user, logout } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
@@ -56,9 +59,22 @@ export function SessionList({ activeId, onSelect, onNew }: SessionListProps) {
   return (
     <div className="flex h-full w-72 flex-col border-r border-white/10 bg-[#122033] text-white shadow-[18px_0_50px_rgba(9,18,30,0.24)]">
       <div className="border-b border-white/10 p-4">
-        <div className="mb-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-[rgba(214,225,241,0.66)]">Workspace</p>
-          <span className="mt-2 block text-lg font-semibold tracking-tight text-white">ChatBridge</span>
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.24em] text-[rgba(214,225,241,0.66)]">Workspace</p>
+            <span className="mt-2 block text-lg font-semibold tracking-tight text-white">ChatBridge</span>
+          </div>
+          {onRequestCollapse && (
+            <button
+              type="button"
+              onClick={onRequestCollapse}
+              title="Hide conversation list"
+              aria-label="Hide conversation list"
+              className="shrink-0 rounded-xl border border-white/15 p-2 text-[rgba(214,225,241,0.9)] transition hover:bg-white/10 hover:text-white"
+            >
+              <IconChevronLeft className="block" />
+            </button>
+          )}
         </div>
         <button
           type="button"

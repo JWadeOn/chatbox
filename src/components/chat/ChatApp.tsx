@@ -8,10 +8,12 @@ import { useCallback, useState } from 'react';
 import { SessionList } from '@/components/chatbox/SessionList';
 import { useAuth } from '@/lib/auth-context';
 import { ChatWindow } from './ChatWindow';
+import { IconChevronRight } from './SidebarToggleIcons';
 
 export function ChatApp() {
   const { token } = useAuth();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleNew = useCallback(async () => {
     if (!token) return;
@@ -32,12 +34,35 @@ export function ChatApp() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <SessionList activeId={activeConversationId} onSelect={setActiveConversationId} onNew={handleNew} />
+      {sidebarOpen && (
+        <SessionList
+          activeId={activeConversationId}
+          onSelect={setActiveConversationId}
+          onNew={handleNew}
+          onRequestCollapse={() => setSidebarOpen(false)}
+        />
+      )}
       <main className="relative flex-1 overflow-hidden">
         {activeConversationId && token ? (
-          <ChatWindow conversationId={activeConversationId} token={token} />
+          <ChatWindow
+            conversationId={activeConversationId}
+            token={token}
+            onExpandConversationList={sidebarOpen ? undefined : () => setSidebarOpen(true)}
+          />
         ) : (
           <div className="relative flex h-full items-center justify-center overflow-hidden p-6 sm:p-10">
+            {!sidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                title="Show conversation list"
+                aria-label="Show conversation list"
+                className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-xl border border-[rgba(19,34,56,0.1)] bg-white/90 px-3 py-2 text-sm font-medium text-[#132238] shadow-[0_8px_24px_rgba(19,34,56,0.1)] backdrop-blur-sm transition hover:border-[rgba(15,139,141,0.35)] hover:bg-white"
+              >
+                <IconChevronRight className="block" />
+                <span className="hidden sm:inline">Conversations</span>
+              </button>
+            )}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(15,139,141,0.16),transparent_20%),radial-gradient(circle_at_bottom_right,rgba(224,149,104,0.16),transparent_24%)]" />
             <div className="relative w-full max-w-3xl rounded-[2rem] border border-white/70 bg-[rgba(255,252,247,0.68)] p-8 text-center shadow-[0_24px_70px_rgba(19,34,56,0.14)] backdrop-blur-xl sm:p-12">
               <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[rgba(19,34,56,0.08)] bg-white/70 px-4 py-1.5 text-xs uppercase tracking-[0.28em] text-[rgba(96,113,134,0.88)]">
@@ -57,11 +82,15 @@ export function ChatApp() {
                 </div>
                 <div className="rounded-[1.5rem] border border-[rgba(19,34,56,0.08)] bg-white/75 p-4">
                   <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">Apps</p>
-                  <p className="mt-2 text-sm font-medium text-[#132238]">Open tools in-context when a task needs more than text.</p>
+                  <p className="mt-2 text-sm font-medium text-[#132238]">
+                    Open tools in-context when a task needs more than text.
+                  </p>
                 </div>
                 <div className="rounded-[1.5rem] border border-[rgba(19,34,56,0.08)] bg-white/75 p-4">
                   <p className="text-xs uppercase tracking-[0.22em] text-[rgba(96,113,134,0.78)]">Continuity</p>
-                  <p className="mt-2 text-sm font-medium text-[#132238]">Keep conversations organized and easy to resume.</p>
+                  <p className="mt-2 text-sm font-medium text-[#132238]">
+                    Keep conversations organized and easy to resume.
+                  </p>
                 </div>
               </div>
 
