@@ -4,7 +4,15 @@ import { studyDecks, studyProgress } from '../lib/schema';
 
 type Card = { front: string; back: string };
 
+type SessionStudySnapshot = {
+  deckTitle: string;
+  deckId: string;
+  cardCount: number;
+  lastCardIndex: number;
+};
+
 export class FlashcardsToolHandler {
+  private sessionStudy = new Map<string, SessionStudySnapshot>();
   async handleToolInvoke(
     sessionId: string,
     toolName: string,
@@ -15,7 +23,7 @@ export class FlashcardsToolHandler {
       case 'create_deck':
         return this.createDeck(userId, params);
       case 'load_deck':
-        return this.loadDeck(userId, params);
+        return this.loadDeck(userId, sessionId, params);
       case 'answer_card':
         return this.answerCard(userId, sessionId, params);
       case 'get_progress':
@@ -59,7 +67,11 @@ export class FlashcardsToolHandler {
     };
   }
 
-  private async loadDeck(userId: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async loadDeck(
+    userId: string,
+    appSessionId: string,
+    params: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     const deckId = params.deckId as string | undefined;
     if (!deckId) {
       return { error: 'Missing required parameter: deckId' };
@@ -75,6 +87,14 @@ export class FlashcardsToolHandler {
       return { error: 'Deck not found or access denied' };
     }
 
+    const cards = deck.cards as Card[];
+    this.sessionStudy.set(appSessionId, {
+      deckTitle: deck.title,
+      deckId: deck.id,
+      cardCount: cards.length,
+      lastCardIndex: 0,
+    });
+
     return {
       deck: {
         id: deck.id,
@@ -85,6 +105,14 @@ export class FlashcardsToolHandler {
       },
       currentCard: 0,
     };
+  }
+
+  buildAssistantContext(sessionId: string): string {
+    const snap = this.sessionStudy.get(sessionId);
+    if (!snap) {
+      return '';
+    }
+    return `\n\n## Active App Context\nFlashcards: studying deck "${snap.deckTitle}" (${snap.lastCardIndex + 1} of ${snap.cardCount} cards touched this session).`;
   }
 
   private async answerCard(
@@ -153,6 +181,12 @@ export class FlashcardsToolHandler {
     }
 
     const nextCard = cardIndex + 1 < cards.length ? cardIndex + 1 : null;
+
+    const snap = this.sessionStudy.get(sessionId);
+    if (snap && snap.deckId === deckId) {
+      const idx = nextCard !== null ? nextCard : cardIndex;
+      this.sessionStudy.set(sessionId, { ...snap, lastCardIndex: idx });
+    }
 
     return {
       correct,

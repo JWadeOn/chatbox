@@ -1,9 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { authErrorResponse, extractAuth, requireOperatorRole } from '../../../../../server/middleware/auth.middleware';
 import { AppError, appService } from '../../../../../server/services/app.service';
 import { toolService } from '../../../../../server/services/tool.service';
 
 export async function POST(request: NextRequest) {
   try {
+    const { role } = extractAuth(request);
+    requireOperatorRole(role);
+
     const body = await request.json();
     const { slug, name, description, authType, iframeUrl, toolSchemas, oauthConfig } = body;
 
@@ -29,6 +33,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof AppError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return authErrorResponse(error);
   }
 }

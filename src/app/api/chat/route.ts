@@ -6,6 +6,7 @@ import { FlashcardsToolHandler } from '../../../../server/apps/flashcards';
 import { KhanToolHandler } from '../../../../server/apps/khan';
 import { toolRateLimiter } from '../../../../server/lib/rate-limiter';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
+import { buildActiveAppContextForConversation } from '../../../../server/services/active-app-context.service';
 import { completionService } from '../../../../server/services/completion.service';
 import { conversationService } from '../../../../server/services/conversation.service';
 import { toolService } from '../../../../server/services/tool.service';
@@ -72,25 +73,6 @@ async function executeToolHandler(
   return Promise.race([handler, timeout]);
 }
 
-/**
- * Get active app state for mid-app assistance.
- * Scans chess handler for active games keyed by the conversation.
- */
-function getActiveAppContext(conversationId: string): string {
-  const games = chessHandler as unknown as { games: Map<string, unknown> };
-  if (games.games) {
-    for (const [key] of games.games) {
-      if (key.includes(conversationId)) {
-        const state = chessHandler.getActiveGameState(key);
-        if (state) {
-          return `\n\n## Active App Context\nThere is an active chess game. Current state:\n- FEN: ${state.fen}\n- Turn: ${state.turn}\n- Move history: ${state.history?.join(', ') || 'none'}\n- Material: ${state.material}\nUse this context to help the user if they ask about the game.`;
-        }
-      }
-    }
-  }
-  return '';
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { userId } = extractAuth(request);
@@ -124,7 +106,12 @@ export async function POST(request: NextRequest) {
     const appSummaryContext = await completionService.buildContextWithSummaries(conversationId);
 
     // Build mid-app assistance: inject active app state
-    const activeAppContext = getActiveAppContext(conversationId);
+    const activeAppContext = await buildActiveAppContextForConversation(conversationId, {
+      chess: chessHandler,
+      khan: khanHandler,
+      flashcards: flashcardsHandler,
+      firstprinciples: firstPrinciplesHandler,
+    });
 
     const systemPrompt = `You are an educational assistant on the TutorMeAI platform, helping K-12 students learn through interactive tools and conversation.
 

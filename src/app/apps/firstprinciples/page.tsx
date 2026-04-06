@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useIframeSessionPostMessage } from '@/lib/iframe-postmessage';
 
 type Analysis = {
   question: string;
@@ -25,11 +26,7 @@ const COLORS = {
 export default function FirstPrinciplesApp() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
 
-  const sendToParent = useCallback((msg: Record<string, unknown>) => {
-    if (window.parent !== window) {
-      window.parent.postMessage(JSON.stringify(msg), '*');
-    }
-  }, []);
+  const sendToParent = useIframeSessionPostMessage();
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -41,8 +38,9 @@ export default function FirstPrinciplesApp() {
       }
 
       if (data.method === 'tool_invoke') {
-        const params = data.params as { tool: string; arguments: Record<string, unknown> };
+        const params = data.params as { tool: string; arguments: Record<string, unknown>; invocationId?: string };
         const id = data.id as number;
+        const invocationId = params.invocationId;
 
         if (params.tool === 'analyze') {
           const question = params.arguments?.question as string;
@@ -79,7 +77,7 @@ export default function FirstPrinciplesApp() {
           };
 
           setAnalysis(result);
-          sendToParent({ jsonrpc: '2.0', result, id });
+          sendToParent({ jsonrpc: '2.0', result: { invocationId, ...result }, id });
 
           // Auto-complete after rendering
           setTimeout(() => {

@@ -42,6 +42,17 @@ export class KhanToolHandler {
     return this.sessions.get(sessionId);
   }
 
+  buildAssistantContext(sessionId: string): string {
+    const session = this.sessions.get(sessionId);
+    if (!session?.currentTopic) {
+      return '';
+    }
+    const reviewed = session.topicsReviewed.length
+      ? ` Topics reviewed earlier: ${session.topicsReviewed.join(', ')}.`
+      : '';
+    return `\n\n## Active App Context\nKhan Academy companion: current topic "${session.currentTopic}".${reviewed} Quiz stats: ${session.questionsAsked} question(s) asked, ${session.questionsCorrect} correct.`;
+  }
+
   private openTopic(sessionId: string, params: Record<string, unknown>): Record<string, unknown> {
     const topic = params.topic as string | undefined;
     if (!topic) {

@@ -22,3 +22,12 @@ export function authErrorResponse(error: unknown): NextResponse {
   }
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
+
+const OPERATOR_ROLES = new Set(['admin', 'teacher']);
+
+/** Teachers and admins may register apps and change approval status. */
+export function requireOperatorRole(role: string): void {
+  if (!OPERATOR_ROLES.has(role)) {
+    throw new AuthError('Forbidden: teacher or admin role required', 403);
+  }
+}

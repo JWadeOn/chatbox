@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { APP_APPROVAL_APPROVED } from '../lib/app-approval';
 import { db } from '../lib/db';
 import { apps } from '../lib/schema';
 
@@ -37,7 +38,7 @@ export class ToolService {
       return this.cachedTools;
     }
 
-    const activeApps = await db.select().from(apps).where(eq(apps.status, 'active'));
+    const activeApps = await db.select().from(apps).where(eq(apps.approvalStatus, APP_APPROVAL_APPROVED));
 
     const tools: DiscoveredTool[] = [];
 

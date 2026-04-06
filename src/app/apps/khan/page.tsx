@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useIframeSessionPostMessage } from '@/lib/iframe-postmessage';
 
 type QuizData = {
   topic: string;
@@ -28,11 +29,7 @@ export default function KhanApp() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [stats, setStats] = useState({ questionsAsked: 0, questionsCorrect: 0, topicsReviewed: 0 });
 
-  const sendToParent = useCallback((msg: Record<string, unknown>) => {
-    if (window.parent !== window) {
-      window.parent.postMessage(JSON.stringify(msg), '*');
-    }
-  }, []);
+  const sendToParent = useIframeSessionPostMessage();
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -44,8 +41,9 @@ export default function KhanApp() {
       }
 
       if (data.method === 'tool_invoke') {
-        const params = data.params as { tool: string; arguments: Record<string, unknown> };
+        const params = data.params as { tool: string; arguments: Record<string, unknown>; invocationId?: string };
         const id = data.id as number;
+        const invocationId = params.invocationId;
 
         if (params.tool === 'open_topic') {
           const t = params.arguments?.topic as string;
@@ -58,7 +56,7 @@ export default function KhanApp() {
           setSelectedAnswer(null);
           sendToParent({
             jsonrpc: '2.0',
-            result: { topic: t, status: 'opened', message: `Topic loaded: ${t}` },
+            result: { invocationId, topic: t, status: 'opened', message: `Topic loaded: ${t}` },
             id,
           });
         } else if (params.tool === 'explain_concept') {
@@ -70,7 +68,7 @@ export default function KhanApp() {
           setExplanation({ concept, text });
           setQuiz(null);
           setSelectedAnswer(null);
-          sendToParent({ jsonrpc: '2.0', result: { topic, concept, explanation: text }, id });
+          sendToParent({ jsonrpc: '2.0', result: { invocationId, topic, concept, explanation: text }, id });
         } else if (params.tool === 'quiz') {
           const q: QuizData = {
             topic: topic || '',
@@ -89,7 +87,7 @@ export default function KhanApp() {
           setStats((s) => ({ ...s, questionsAsked: s.questionsAsked + 1 }));
           sendToParent({
             jsonrpc: '2.0',
-            result: { topic, question: q.question, options: q.options, correctIndex: q.correctIndex },
+            result: { invocationId, topic, question: q.question, options: q.options, correctIndex: q.correctIndex },
             id,
           });
         }

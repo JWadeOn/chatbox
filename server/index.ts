@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import next from 'next';
 import { pool } from './lib/db';
+import { isHealthCheckPath, shouldDelegateToNext } from './lib/http-static-routing';
 import { logger } from './lib/logger';
 import { WSManager } from './lib/ws-manager';
 
@@ -43,7 +44,7 @@ app.prepare().then(() => {
     const pathname = url.split('?')[0];
 
     // Health check endpoint — lightweight, no auth required
-    if (pathname === '/health') {
+    if (isHealthCheckPath(pathname)) {
       const status = {
         status: 'ok',
         uptime: Math.floor(process.uptime()),
@@ -62,13 +63,8 @@ app.prepare().then(() => {
       return;
     }
 
-    // API routes, Next.js app pages, and Next.js internals → Next.js
-    if (
-      pathname.startsWith('/api/') ||
-      pathname.startsWith('/apps/') ||
-      pathname.startsWith('/_next/') ||
-      !chatboxAvailable
-    ) {
+    // API routes, /apps/* (Next app bundles), Next internals — or Next-only mode
+    if (shouldDelegateToNext(pathname, chatboxAvailable)) {
       return handle(req, res);
     }
 

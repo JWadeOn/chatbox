@@ -36,6 +36,8 @@ beforeAll(async () => {
       description: 'Test app',
       authType: 'none',
       iframeUrl: '/apps/flashcards',
+      status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [],
     })
     .returning();

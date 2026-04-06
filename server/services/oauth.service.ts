@@ -49,8 +49,14 @@ export class OAuthService {
 
     const encodedState = Buffer.from(JSON.stringify(state)).toString('base64');
 
-    // Build Spotify-style OAuth authorization URL
     const config = this.getOAuthConfig(appSlug);
+    if (!config.clientId?.trim()) {
+      throw new OAuthError(
+        'OAuth is not configured for this app. Flashcards and platform auth use your ChatBridge login; external OAuth is optional.',
+        501
+      );
+    }
+
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: config.clientId,

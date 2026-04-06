@@ -4,6 +4,8 @@ AI chat platform with sandboxed third-party app integration, built for TutorMeAI
 
 Third-party learning tools register via an MCP-aligned schema, render UI inside sandboxed iframes, and communicate with the platform over JSON-RPC 2.0 postMessage. The server handles all LLM interaction -- clients never call OpenAI directly.
 
+**Frontend:** The forked **Chatbox** tree under `chatbox/` is the canonical chat shell; ChatBridge injects auth, the ChatBridge model provider, and iframe rendering there. The Next.js chat UI under `src/components/chat/` is a secondary path for parity and experiments. When a built Chatbox web bundle is present at `chatbox/release/app/dist/renderer`, the custom Node server can serve it as the primary static shell (see `server/index.ts`).
+
 **Live:** [chatbox-production-9695.up.railway.app](https://chatbox-production-9695.up.railway.app)
 
 ## Tech Stack
@@ -45,10 +47,12 @@ pnpm dev
 
 After running `pnpm db:seed`:
 
-| Field | Value |
-|-------|-------|
-| Email | `demo@chatbridge.com` |
-| Password | `demo1234` |
+| Account | Email | Password |
+|---------|-------|----------|
+| Student (demo) | `demo@chatbridge.com` | `demo1234` |
+| Admin (app governance) | `admin@chatbridge.com` | `admin1234` |
+
+The admin account can call `POST /api/apps/register`, `GET /api/apps/pending`, and `PATCH /api/apps/:slug` (approve/disable). New app registrations start as **pending** until an operator approves them.
 
 Or register a new account from the login page.
 

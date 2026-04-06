@@ -10,6 +10,13 @@ const DEMO_USER = {
   role: 'student',
 };
 
+const DEMO_ADMIN = {
+  email: 'admin@chatbridge.com',
+  password: 'admin1234',
+  displayName: 'Demo Admin',
+  role: 'admin',
+};
+
 const CHESS_APP = {
   slug: 'chess',
   name: 'Chess',
@@ -211,11 +218,28 @@ async function seed() {
     console.info('Demo user created: demo@chatbridge.com / demo1234');
   }
 
+  const existingAdmin = await db.select().from(users).where(eq(users.email, DEMO_ADMIN.email)).limit(1);
+  if (existingAdmin.length > 0) {
+    console.info('Demo admin already exists, skipping.');
+  } else {
+    const adminHash = await bcrypt.hash(DEMO_ADMIN.password, 10);
+    await db.insert(users).values({
+      email: DEMO_ADMIN.email,
+      passwordHash: adminHash,
+      displayName: DEMO_ADMIN.displayName,
+      role: DEMO_ADMIN.role,
+    });
+    console.info('Demo admin created: admin@chatbridge.com / admin1234 (app registration & approval)');
+  }
+
   // Deactivate old apps that are no longer in the spec
   for (const slug of ['weather', 'spotify']) {
     const [old] = await db.select().from(apps).where(eq(apps.slug, slug)).limit(1);
     if (old && old.status === 'active') {
-      await db.update(apps).set({ status: 'inactive' }).where(eq(apps.id, old.id));
+      await db
+        .update(apps)
+        .set({ status: 'inactive', approvalStatus: 'disabled', updatedAt: new Date() })
+        .where(eq(apps.id, old.id));
       console.info(`Deactivated old app: ${slug}`);
     }
   }
@@ -227,11 +251,21 @@ async function seed() {
     if (existing) {
       await db
         .update(apps)
-        .set({ toolSchemas: app.toolSchemas, description: app.description, updatedAt: new Date() })
+        .set({
+          toolSchemas: app.toolSchemas,
+          description: app.description,
+          status: 'active',
+          approvalStatus: 'approved',
+          updatedAt: new Date(),
+        })
         .where(eq(apps.id, existing.id));
       console.info(`${app.slug} app updated with latest schemas.`);
     } else {
-      await db.insert(apps).values(app);
+      await db.insert(apps).values({
+        ...app,
+        status: 'active',
+        approvalStatus: 'approved',
+      });
       console.info(`${app.slug} app registered.`);
     }
   }

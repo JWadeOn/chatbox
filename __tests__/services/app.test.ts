@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { APP_APPROVAL_APPROVED, APP_APPROVAL_PENDING } from '../../server/lib/app-approval';
 import { db } from '../../server/lib/db';
 import { apps } from '../../server/lib/schema';
 import { AppError, AppService } from '../../server/services/app.service';
@@ -29,7 +30,7 @@ afterAll(async () => {
 });
 
 describe('AppService.register', () => {
-  it('registers with valid schema and returns app with sanitized toolSchemas and status active', async () => {
+  it('registers with valid schema and returns app with sanitized toolSchemas and pending approval', async () => {
     const result = await appService.register({
       slug: TEST_SLUG,
       name: 'Test App',
@@ -42,7 +43,8 @@ describe('AppService.register', () => {
     expect(result.id).toBeDefined();
     expect(result.slug).toBe(TEST_SLUG);
     expect(result.name).toBe('Test App');
-    expect(result.status).toBe('active');
+    expect(result.status).toBe('inactive');
+    expect(result.approvalStatus).toBe(APP_APPROVAL_PENDING);
     expect(result.toolSchemas).toHaveLength(2);
     // Verify sanitization was applied (names should be alphanumeric/underscore only)
     for (const tool of result.toolSchemas as { name: string; description: string }[]) {
@@ -143,16 +145,25 @@ describe('AppService.register', () => {
 });
 
 describe('AppService.listApps', () => {
-  it('returns all active apps including the registered test app', async () => {
+  beforeEach(async () => {
+    await appService.setApprovalStatus(TEST_SLUG, APP_APPROVAL_APPROVED);
+  });
+
+  it('returns all approved apps including the registered test app', async () => {
     const allApps = await appService.listApps();
     expect(Array.isArray(allApps)).toBe(true);
     const found = allApps.find((a) => a.slug === TEST_SLUG);
     expect(found).toBeDefined();
     expect(found?.status).toBe('active');
+    expect(found?.approvalStatus).toBe(APP_APPROVAL_APPROVED);
   });
 });
 
 describe('AppService.getAppBySlug', () => {
+  beforeEach(async () => {
+    await appService.setApprovalStatus(TEST_SLUG, APP_APPROVAL_APPROVED);
+  });
+
   it('returns an app by slug', async () => {
     const app = await appService.getAppBySlug(TEST_SLUG);
     expect(app).not.toBeNull();

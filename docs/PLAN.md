@@ -1,5 +1,22 @@
 # ChatBridge Integration Plan — Option C: Chatbox Web Build as Frontend Shell
 
+## Status (living document)
+
+Last aligned with implementation: **2026-04**.
+
+| Area | State |
+|------|--------|
+| **Canonical frontend** | Chatbox web build under `chatbox/`, served when `chatbox/release/app/dist/renderer/index.html` exists. Routing rules: `server/lib/http-static-routing.ts` (+ tests in `__tests__/server/`). |
+| **Secondary frontend** | Next App Router chat UI (`src/components/chat/*`, `src/app/page.tsx`) remains for dev/parity; **not** removed. See `CLAUDE.md` and `docs/SPEC.md` §4.2. |
+| **App governance** | `apps.approval_status`: pending → approved → disabled; public listing and tool discovery only for **approved**; register + PATCH gated to operators. |
+| **Iframe bridge** | Shared `src/lib/iframe-bridge/` (sandbox, iframe `src` + session, postMessage targets). Next imports `@/lib/iframe-bridge`; Chatbox imports `@chatbridge/iframe-bridge` (Vite alias in `chatbox/electron.vite.config.ts`). JSON-RPC handlers remain duplicated in `src/lib/postmessage.ts` and `chatbox/.../postmessage.ts` — keep behaviorally in sync. |
+| **Active app context** | App-agnostic mid-chat context via `server/services/active-app-context.service.ts` (not chess-only). |
+| **Spec / gaps** | Broader product spec and reconciliation: `docs/SPEC.md`. This file is the **integration / serving** plan; it does not replace SPEC. |
+
+**Note:** A separate Cursor-generated “Close spec gaps” checklist may live under `.cursor/plans/`; that file is optional for tracking. **This** `docs/PLAN.md` is the repo copy of the integration plan and should be updated when architecture changes.
+
+---
+
 ## Goal
 
 Use Chatbox's actual web build as the ChatBridge frontend, with the ChatBridge server as the backend. This makes the brownfield relationship real: ChatBridge features (server-side LLM, tool routing, app platform, auth, persistence) are delivered through the Chatbox UI, not a parallel rebuild.
@@ -57,9 +74,11 @@ Maps Chatbox session IDs to ChatBridge conversation IDs in PostgreSQL. Auto-crea
 Third-party apps (chess, weather, spotify) render in sandboxed iframes within Chatbox's message rendering. When the server returns an `app_render` SSE event, a special tool-call content part is created that triggers the `AppRenderer` component.
 
 **Files:**
-- `chatbox/src/renderer/components/chatbridge/AppRenderer.tsx` — sandboxed iframe component
-- `chatbox/src/renderer/components/chatbridge/postmessage.ts` — JSON-RPC 2.0 protocol
-- `chatbox/src/renderer/components/chatbridge/invocation-buffer.ts` — message queue until iframe ready
+- `chatbox/src/renderer/components/chatbridge/AppRenderer.tsx` — sandboxed iframe component (uses `@chatbridge/iframe-bridge`)
+- `src/components/chat/AppRenderer.tsx` — Next secondary shell (uses `@/lib/iframe-bridge`)
+- `src/lib/iframe-bridge/*` — shared trust boundary, iframe URL, postMessage target/origin helpers
+- `chatbox/src/renderer/components/chatbridge/postmessage.ts` — JSON-RPC 2.0 protocol (keep in sync with `src/lib/postmessage.ts`)
+- `chatbox/src/renderer/components/chatbridge/invocation-buffer.ts` — message queue until iframe ready (ported twin of `src/lib/invocation-buffer.ts`)
 - `chatbox/src/renderer/components/message-parts/ToolCallPartUI.tsx` — renders AppRenderer for app_render events
 
 ### 5. Auto-Configuration
@@ -74,14 +93,15 @@ On startup, forces the ChatBridge provider as default for new sessions and ensur
 The Chatbox web build produces a SPA. The ChatBridge server serves it as static files, with API routes handled by Next.js.
 
 **Files:**
-- `server/index.ts` — static file serving for Chatbox SPA + SPA fallback
+- `server/index.ts` — static file serving for Chatbox SPA + SPA fallback; delegates `/api/*`, `/apps/*`, `/_next/*` to Next
+- `server/lib/http-static-routing.ts` — pure rules for “Next vs static SPA” (+ unit tests)
 - `package.json` — `build:chatbox` and `build:all` scripts
 
 ---
 
-## Server (Unchanged)
+## Server and APIs (evolving)
 
-The entire server control plane is unchanged:
+Core services remain centered here:
 
 - `server/services/chat.service.ts` — LLM orchestration
 - `server/services/tool-router.service.ts` — tool invocation lifecycle
@@ -89,11 +109,14 @@ The entire server control plane is unchanged:
 - `server/services/completion.service.ts` — context retention
 - `server/services/conversation.service.ts` — persistence
 - `server/services/auth.service.ts` — JWT auth
-- `server/services/oauth.service.ts` — Spotify OAuth
-- `server/apps/chess.ts`, `weather.ts`, `spotify.ts` — app handlers
-- `server/lib/*` — database, logging, circuit breaker, etc.
-- `src/app/api/*` — all API routes
-- `src/app/apps/*` — chess and spotify app pages
+- `server/services/app.service.ts` — app registry + **approval lifecycle** (pending / approved / disabled)
+- `server/services/tool.service.ts` — tool discovery (approved apps only)
+- `server/services/oauth.service.ts` — OAuth broker (configure per app)
+- `server/services/active-app-context.service.ts` — mid-app assistant context by active session
+- `server/apps/*` — per-app tool handlers (chess, khan, flashcards, firstprinciples, etc.)
+- `server/lib/*` — database, logging, circuit breaker, `http-static-routing`, etc.
+- `src/app/api/*` — route handlers (including `apps/register`, `apps/pending`, `apps/[slug]` PATCH, `app-complete`, `tool-invocation-result`)
+- `src/app/apps/*` — first-party iframe app pages (chess, khan, flashcards, …)
 
 ---
 
@@ -110,17 +133,14 @@ The entire server control plane is unchanged:
 
 ---
 
-## Deprecated
+## Secondary Next path (not deprecated)
 
-The following files in `src/` were part of the parallel rebuild and are superseded by the Chatbox integration:
+For **Chatbox shell** deployments, the Chatbox UI is primary. The following `src/` areas still exist as a **secondary** Next-based chat surface (development, parity, and routes that must stay on Next: `/api/*`, `/apps/*` pages):
 
-- `src/components/chat/*` — replaced by Chatbox UI
-- `src/components/chatbox/*` — no longer needed (using real Chatbox)
-- `src/lib/extracted/chatbox/*` — no longer needed (using real Chatbox packages)
-- `src/lib/use-chat.ts` — replaced by Chatbox's session/generation system
-- `src/lib/chat-transport.ts` — replaced by ChatBridge provider
-- `src/lib/transcript-store.ts` — replaced by Chatbox's session store
-- `src/lib/app-orchestrator.ts` — logic moved into Chatbox components
-- `src/lib/auth-context.tsx` — replaced by AuthGate in Chatbox
+- `src/components/chat/*`, `src/app/page.tsx`, `src/lib/use-chat.ts`, `src/lib/auth-context.tsx`, etc.
 
-These files remain in the repo for reference but are not used in the Chatbox shell flow.
+They are **not** deleted; they must stay aligned on iframe protocol and governance with the Chatbox path (shared `iframe-bridge`, same approval and API behavior).
+
+**Extracted Chatbox-derived modules** (`src/lib/extracted/chatbox/`, `src/components/chatbox/*`) support the Next UI and tests; they are not “dead” code.
+
+When the team explicitly retires the Next chat UI, this section can be replaced with a true deprecation list.

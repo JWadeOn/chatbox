@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { db } from '../../server/lib/db';
-import { conversations, messages, users } from '../../server/lib/schema';
+import { appSessions, conversations, messages, toolLogs, users } from '../../server/lib/schema';
 import { ConversationService } from '../../server/services/conversation.service';
 
 const service = new ConversationService();
@@ -24,8 +24,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(messages);
-  await db.delete(conversations);
+  const convRows = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(or(eq(conversations.userId, testUserId), eq(conversations.userId, testUser2Id)));
+  const convIds = convRows.map((r) => r.id);
+  if (convIds.length > 0) {
+    await db.delete(toolLogs).where(inArray(toolLogs.conversationId, convIds));
+    await db.delete(appSessions).where(inArray(appSessions.conversationId, convIds));
+    await db.delete(messages).where(inArray(messages.conversationId, convIds));
+    await db.delete(conversations).where(inArray(conversations.id, convIds));
+  }
   await db.delete(users).where(eq(users.id, testUserId));
   await db.delete(users).where(eq(users.id, testUser2Id));
 });

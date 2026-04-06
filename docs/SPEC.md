@@ -149,6 +149,8 @@ ChatBridge uses Chatbox's actual web build as the frontend shell. This means:
 * The server control plane (auth, LLM, tools, apps, authenticated app flows) is owned by ChatBridge
 * Chatbox handles UI, state management, message rendering, and chat ergonomics
 
+**Implementation note:** The repo also contains a Next App Router chat UI (`src/components/chat/`) as a **secondary** surface for development and parity. The **canonical** product direction is the Chatbox shell under `chatbox/`; the Next chat UI should not diverge in protocol or security behavior from the Chatbox path. Shared iframe trust and URL/postMessage helpers live in `src/lib/iframe-bridge/` (imported by Next as `@/lib/iframe-bridge` and by Chatbox as `@chatbridge/iframe-bridge` via the Vite alias in `chatbox/electron.vite.config.ts`). HTTP static routing (Next vs Chatbox SPA) is expressed in `server/lib/http-static-routing.ts` and covered by unit tests.
+
 ---
 
 ## 5. Repo Ownership and Boundaries
@@ -452,7 +454,7 @@ The platform distinguishes between **internal apps** (first-party, served from t
 
 **Why the exception is safe:** the sandbox is a trust boundary for *untrusted* third-party code. Internal apps are first-party code the platform ships, so the trust boundary for them lives in the code review / deploy pipeline, not the browser sandbox. Granting `allow-same-origin` to code we already trust adds no real attack surface.
 
-**Concrete rule:** the `AppRenderer` checks `iframeUrl.startsWith('/')` to determine internal vs external. Internal apps get `allow-same-origin`; external apps do not. This check is the single place the trust boundary is enforced.
+**Concrete rule:** internal vs external is determined by `isInternalAppIframe` (`iframeUrl.startsWith('/')`) in `src/lib/iframe-bridge/constants.ts`, used by both AppRenderer implementations. Internal apps get `allow-same-origin`; external apps do not. This check is the single place the trust boundary is enforced for iframe sandbox attributes.
 
 ### 11.2 Data Minimization
 

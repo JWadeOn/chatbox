@@ -4,10 +4,17 @@
 
 ChatBridge is an AI chat platform with sandboxed third-party app integration, built for TutorMeAI (K-12, 200K DAU). Built as a brownfield extension on top of the forked Chatbox codebase -- proving we can work with and extend an existing project.
 
+### Frontend source of truth
+
+- **Canonical shell:** `chatbox/` is the primary shipped Chat UI. ChatBridge extends Chatbox via the `chatbridge` provider, `AuthGate`, `AppRenderer`, and stores under `chatbox/src/renderer/components/chatbridge/` and `chatbox/src/renderer/stores/chatbridge/`.
+- **Secondary path:** `src/components/chat/*` (Next App Router) is a transitional/alternate chat surface for development and parity checks until it is explicitly retired or merged with the Chatbox shell.
+- **Serving:** When `chatbox/release/app/dist/renderer` exists, [server/index.ts](server/index.ts) serves the Chatbox SPA for non-API routes; otherwise Next.js handles the UI. Routing rules are centralized in [server/lib/http-static-routing.ts](server/lib/http-static-routing.ts) (see `__tests__/server/http-static-routing.test.ts`). API routes and `/apps/*` always go through Next.
+- **Shared iframe bridge:** [src/lib/iframe-bridge/](src/lib/iframe-bridge/) holds sandbox strings, session query on iframe `src`, postMessage `targetOrigin` / listener `expectedOrigin`, and invocation-id validation. Next [AppRenderer](src/components/chat/AppRenderer.tsx) imports via `@/lib/iframe-bridge`; Chatbox [AppRenderer](chatbox/src/renderer/components/chatbridge/AppRenderer.tsx) imports `@chatbridge/iframe-bridge`, resolved by [chatbox/electron.vite.config.ts](chatbox/electron.vite.config.ts). JSON-RPC handling remains in [src/lib/postmessage.ts](src/lib/postmessage.ts) and the ported [chatbox/.../postmessage.ts](chatbox/src/renderer/components/chatbridge/postmessage.ts) — keep them behaviorally identical.
+
 ## Stack
 
 - Next.js 14+ (App Router) with TypeScript 5 (strict mode)
-- PostgreSQL (conversations, messages, users, apps, tool_logs, intents, app_sessions, oauth_tokens)
+- PostgreSQL (conversations, messages, users, apps, tool_logs, intents, app_sessions, oauth_tokens — maps to spec **app_auth_tokens** for platform-stored third-party tokens)
 - WebSockets (ws) for real-time streaming chat
 - OpenAI API (function calling, tiered model routing)
 - Zod for request validation
@@ -31,14 +38,14 @@ chatbridge/
 │   │   ├── chat/               # ChatWindow, MessageList, MessageInput, StreamingMessage, AppRenderer
 │   │   ├── auth/               # LoginForm, RegisterForm
 │   │   └── ui/                 # Shared (loading, errors)
-│   ├── lib/                    # db, llm, ws, tools, postmessage, circuit-breaker, invocation-state, auth
+│   ├── lib/                    # db, llm, ws, tools, postmessage, iframe-bridge, circuit-breaker, invocation-state, auth
 │   └── types/
 ├── server/
 │   ├── index.ts                # Express + WebSocket setup
 │   ├── routes/                 # auth, conversations, apps, tools, oauth
 │   ├── services/               # chat, tool-router, intent, app, tool, auth, oauth
 │   ├── middleware/              # auth (JWT), validation
-│   └── lib/                    # db, llm, circuit-breaker, invocation-state, schema-sanitizer, logger, ws-manager
+│   └── lib/                    # db, llm, http-static-routing, circuit-breaker, invocation-state, schema-sanitizer, logger, ws-manager
 ├── __tests__/                  # Mirrors src/ and server/ structure
 ├── chatbox/                    # Forked Chatbox codebase -- the foundation we build on top of
 ├── docs/                       # PRD, SPEC, RECONCILIATION, CONVENTIONS, ADRs
@@ -74,7 +81,7 @@ chatbridge/
 ## Architecture & Patterns
 
 - **Server-side LLM only.** All LLM calls happen on the server. Client never talks to OpenAI directly.
-- **Sandboxed iframes** for app UI. Internal apps (first-party, served from `/apps/*`) get `allow-scripts allow-forms allow-popups allow-same-origin` because they need to load their own Next.js bundles and are trusted code. External third-party apps get `allow-scripts allow-forms allow-popups` ONLY — no `allow-same-origin`. The `iframeUrl.startsWith('/')` check in AppRenderer is the trust boundary.
+- **Sandboxed iframes** for app UI. Internal apps (first-party, served from `/apps/*`) get `allow-scripts allow-forms allow-popups allow-same-origin` because they need to load their own Next.js bundles and are trusted code. External third-party apps get `allow-scripts allow-forms allow-popups` ONLY — no `allow-same-origin`. The trust boundary is `isInternalAppIframe` / `iframeUrl.startsWith('/')` in [src/lib/iframe-bridge/constants.ts](src/lib/iframe-bridge/constants.ts).
 - **JSON-RPC 2.0 over postMessage** for app-platform communication. Validate `event.origin` on every message.
 - **Three-layer state:** chat state (server), app state (iframe), contextual bridge (summaries linking them).
 - **Intent tracking:** user intent is a first-class concept. One active intent per conversation. Transitions: general_chat <-> app_intent.

@@ -45,6 +45,8 @@ beforeAll(async () => {
       description: 'App for intent service tests',
       authType: 'none',
       iframeUrl: 'https://example.com/intent-test',
+      status: 'active',
+      approvalStatus: 'approved',
     })
     .returning();
   testAppId = app.id;

@@ -45,6 +45,7 @@ beforeAll(async () => {
       authType: 'none',
       iframeUrl: 'https://example.com/router-test-1',
       status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [
         {
           name: 'search',
@@ -71,6 +72,7 @@ beforeAll(async () => {
       authType: 'none',
       iframeUrl: 'https://example.com/router-test-2',
       status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [
         {
           name: 'lookup',

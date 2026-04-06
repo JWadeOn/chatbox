@@ -362,6 +362,15 @@ export class ChessToolHandler {
   }
 
   /** Get active game state for mid-app assistance context injection. */
+  /** LLM-facing summary for mid-app assistance (tutoring + Lichess). */
+  buildAssistantContext(sessionId: string): string {
+    const state = this.getActiveGameState(sessionId);
+    if (!state) {
+      return '';
+    }
+    return `\n\n## Active App Context\nThere is an active chess game. Current state:\n- FEN: ${state.fen}\n- Turn: ${state.turn}\n- Move history: ${state.history?.join(', ') || 'none'}\n- Material: ${state.material}\nUse this context to help the user if they ask about the game.`;
+  }
+
   getActiveGameState(sessionId: string): {
     fen: string;
     turn: string;

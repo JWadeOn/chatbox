@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvocationBuffer } from '../../src/lib/invocation-buffer';
 import { createPostMessageListener, createToolInvokeMessage } from '../../src/lib/postmessage';
 
@@ -10,6 +10,10 @@ describe('createPostMessageListener', () => {
     onAppError: vi.fn(),
     onHeartbeat: vi.fn(),
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   const listener = createPostMessageListener('https://chess.app', handlers);
 
@@ -57,6 +61,32 @@ describe('createPostMessageListener', () => {
       data: { jsonrpc: '2.0', result: { success: true, board_fen: 'xyz' }, id: 1 },
     } as MessageEvent);
     expect(handlers.onToolResult).toHaveBeenCalledWith('1', { success: true, board_fen: 'xyz' });
+  });
+
+  it('rejects app_complete when sessionId does not match expected', () => {
+    const scoped = createPostMessageListener('https://chess.app', handlers, false, 'session-a');
+    scoped({
+      origin: 'https://chess.app',
+      data: {
+        jsonrpc: '2.0',
+        method: 'app_complete',
+        params: { sessionId: 'other', summary: 'x', data: {} },
+      },
+    } as MessageEvent);
+    expect(handlers.onAppComplete).not.toHaveBeenCalled();
+  });
+
+  it('accepts app_complete when sessionId matches', () => {
+    const scoped = createPostMessageListener('https://chess.app', handlers, false, 'session-a');
+    scoped({
+      origin: 'https://chess.app',
+      data: {
+        jsonrpc: '2.0',
+        method: 'app_complete',
+        params: { sessionId: 'session-a', summary: 'done', data: { ok: true } },
+      },
+    } as MessageEvent);
+    expect(handlers.onAppComplete).toHaveBeenCalledWith('done', { ok: true });
   });
 
   it('ignores invalid JSON string', () => {

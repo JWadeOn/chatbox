@@ -2,6 +2,7 @@
 
 import { Chess } from 'chess.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIframeSessionPostMessage } from '@/lib/iframe-postmessage';
 
 const PIECE_UNICODE: Record<string, string> = {
   K: '\u2654',
@@ -84,11 +85,7 @@ export default function ChessApp() {
     }
   }, []);
 
-  const sendToParent = useCallback((msg: Record<string, unknown>) => {
-    if (window.parent !== window) {
-      window.parent.postMessage(JSON.stringify(msg), '*');
-    }
-  }, []);
+  const sendToParent = useIframeSessionPostMessage();
 
   const updateStatus = useCallback(() => {
     const game = gameRef.current;
@@ -185,8 +182,9 @@ export default function ChessApp() {
       }
 
       if (data.method === 'tool_invoke') {
-        const params = data.params as { tool: string; arguments: Record<string, unknown> };
+        const params = data.params as { tool: string; arguments: Record<string, unknown>; invocationId?: string };
         const id = data.id as number;
+        const invocationId = params.invocationId;
 
         if (params.tool === 'start_game') {
           const gameMode = (params.arguments?.mode as string) || 'tutoring';
@@ -204,7 +202,7 @@ export default function ChessApp() {
             if (gameUrl) window.open(gameUrl, '_blank');
             sendToParent({
               jsonrpc: '2.0',
-              result: { mode: gameMode, game_url: gameUrl, status: 'opened' },
+              result: { invocationId, mode: gameMode, game_url: gameUrl, status: 'opened' },
               id,
             });
           } else {
@@ -221,6 +219,7 @@ export default function ChessApp() {
             sendToParent({
               jsonrpc: '2.0',
               result: {
+                invocationId,
                 board_fen: gameRef.current.fen(),
                 player_color: color === 'b' ? 'black' : 'white',
                 status: 'in_progress',
@@ -246,12 +245,13 @@ export default function ChessApp() {
             } else {
               setLichessStatus((result.status as string) || 'in_progress');
             }
-            sendToParent({ jsonrpc: '2.0', result, id });
+            sendToParent({ jsonrpc: '2.0', result: { invocationId, ...(result as Record<string, unknown>) }, id });
           } else {
             const game = gameRef.current;
             sendToParent({
               jsonrpc: '2.0',
               result: {
+                invocationId,
                 board_fen: game.fen(),
                 move_history: game.history(),
                 current_turn: game.turn() === 'w' ? 'white' : 'black',

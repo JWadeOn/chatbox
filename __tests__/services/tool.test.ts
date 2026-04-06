@@ -22,6 +22,7 @@ async function seedTestApps() {
       authType: 'none',
       iframeUrl: 'https://example.com/active1',
       status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [
         {
           name: 'search',
@@ -50,6 +51,7 @@ async function seedTestApps() {
       authType: 'none',
       iframeUrl: 'https://example.com/active2',
       status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [
         {
           name: 'lookup',
@@ -69,6 +71,7 @@ async function seedTestApps() {
       authType: 'none',
       iframeUrl: 'https://example.com/inactive',
       status: 'inactive',
+      approvalStatus: 'disabled',
       toolSchemas: [
         {
           name: 'hidden_tool',
@@ -88,7 +91,7 @@ afterAll(async () => {
 });
 
 describe('ToolService.discoverTools', () => {
-  it('returns tools only from active apps', async () => {
+  it('returns tools only from approved apps', async () => {
     await seeded;
     const tools = await toolService.discoverTools();
 
@@ -98,7 +101,7 @@ describe('ToolService.discoverTools', () => {
     expect(activeToolNames).toContain('create');
     expect(activeToolNames).toContain('lookup');
 
-    // Should NOT include tools from the inactive app
+    // Should NOT include tools from the disabled / non-approved app
     const inactiveTools = tools.filter((t) => t.appSlug === INACTIVE_SLUG);
     expect(inactiveTools).toHaveLength(0);
   });
@@ -138,7 +141,7 @@ describe('ToolService.discoverTools', () => {
     expect(Array.isArray(tools)).toBe(true);
   });
 
-  it('excludes inactive apps tools', async () => {
+  it('excludes non-approved apps tools', async () => {
     await seeded;
     const tools = await toolService.discoverTools();
     const hiddenTools = tools.filter((t) => t.toolName === 'hidden_tool' && t.appSlug === INACTIVE_SLUG);

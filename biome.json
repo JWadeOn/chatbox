@@ -34,6 +34,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/.next", "!**/chatbox", "!**/dist", "!**/coverage"]
+    "includes": ["**", "!**/node_modules", "!**/.next", "!**/chatbox", "!**/dist", "!**/coverage", "!**/docs/**/*.html"]
   }
 }

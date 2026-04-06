@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { APP_APPROVAL_APPROVED } from '../../server/lib/app-approval';
 import { db } from '../../server/lib/db';
 import { appSessions, apps, conversations, intents, toolLogs, users } from '../../server/lib/schema';
 import { AppService } from '../../server/services/app.service';
@@ -16,6 +17,8 @@ let testUserId: string;
 let testConversationId: string;
 let chessAppId: string;
 let khanAppId: string;
+let chessSlug: string;
+let khanSlug: string;
 
 beforeAll(async () => {
   const [user] = await db
@@ -36,6 +39,8 @@ beforeAll(async () => {
     toolSchemas: [{ name: 'start_game', description: 'Start a chess game', parameters: {} }],
   });
   chessAppId = chessApp.id;
+  chessSlug = chessApp.slug;
+  await appService.setApprovalStatus(chessApp.slug, APP_APPROVAL_APPROVED);
 
   const khanApp = await appService.register({
     slug: `khan-multiapp-${Date.now()}`,
@@ -46,6 +51,8 @@ beforeAll(async () => {
     toolSchemas: [{ name: 'open_topic', description: 'Open a topic', parameters: {} }],
   });
   khanAppId = khanApp.id;
+  khanSlug = khanApp.slug;
+  await appService.setApprovalStatus(khanApp.slug, APP_APPROVAL_APPROVED);
 });
 
 afterAll(async () => {
@@ -64,9 +71,7 @@ describe('Multi-app switching', () => {
   it('invokes chess app and creates active session', async () => {
     const result = await toolRouter.invoke({
       conversationId: testConversationId,
-      appSlug:
-        (await appService.getAppBySlug(`chess-multiapp-${chessAppId.slice(0, 8)}`))?.slug ||
-        (await db.select().from(apps).where(eq(apps.id, chessAppId)).limit(1))[0].slug,
+      appSlug: chessSlug,
       toolName: 'start_game',
       toolParams: {},
       userId: testUserId,
@@ -91,10 +96,9 @@ describe('Multi-app switching', () => {
   });
 
   it('switching to khan app after chess works', async () => {
-    const [khanApp] = await db.select().from(apps).where(eq(apps.id, khanAppId)).limit(1);
     const result = await toolRouter.invoke({
       conversationId: testConversationId,
-      appSlug: khanApp.slug,
+      appSlug: khanSlug,
       toolName: 'open_topic',
       toolParams: { topic: 'Fractions' },
       userId: testUserId,
@@ -109,10 +113,9 @@ describe('Multi-app switching', () => {
   });
 
   it('refuses invocation for non-existent tool', async () => {
-    const [khanApp] = await db.select().from(apps).where(eq(apps.id, khanAppId)).limit(1);
     const result = await toolRouter.invoke({
       conversationId: testConversationId,
-      appSlug: khanApp.slug,
+      appSlug: khanSlug,
       toolName: 'nonexistent_tool',
       toolParams: {},
       userId: testUserId,

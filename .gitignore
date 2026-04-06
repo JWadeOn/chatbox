@@ -25,6 +25,8 @@ build/
 
 # Test
 coverage/
+/test-results/
+/playwright-report/
 
 # Debug
 npm-debug.log*

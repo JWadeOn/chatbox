@@ -75,7 +75,7 @@ export function ChatWindow({ conversationId, token }: ChatWindowProps) {
               appSlug={appEmbed.appSlug}
               iframeUrl={appEmbed.iframeUrl}
               sessionId={appEmbed.sessionId}
-              onToolResult={() => {}}
+              token={token}
               onAppComplete={(summary, data) => handleAppComplete(summary, data)}
               onAppError={(message, recoverable) => handleAppError(message, recoverable)}
               onClose={closeApp}

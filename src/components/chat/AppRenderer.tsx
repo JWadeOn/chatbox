@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import {
+  buildIframeSrcWithSession,
+  getListenerExpectedOrigin,
+  getPostMessageTargetForToolInvoke,
+  IFRAME_LOAD_TIMEOUT_MS,
+  iframeSandboxAttribute,
+  isInternalAppIframe,
+  isValidToolInvocationId,
+} from '@/lib/iframe-bridge';
 import { InvocationBuffer } from '@/lib/invocation-buffer';
 import { createPostMessageListener, type createToolInvokeMessage, type PostMessageHandler } from '@/lib/postmessage';
 
@@ -10,7 +19,9 @@ type AppRendererProps = {
   appSlug: string;
   iframeUrl: string;
   sessionId: string;
-  onToolResult: (invocationId: string, result: unknown) => void;
+  token: string;
+  /** Optional override; default relays UUID `invocationId` to `/api/tool-invocation-result`. */
+  onToolResult?: (invocationId: string, result: unknown) => void;
   onAppComplete: (summary: string, data: Record<string, unknown>) => void;
   onAppError: (message: string, recoverable: boolean) => void;
   onClose: () => void;
@@ -20,7 +31,8 @@ export function AppRenderer({
   appSlug,
   iframeUrl,
   sessionId,
-  onToolResult,
+  token,
+  onToolResult: onToolResultProp,
   onAppComplete,
   onAppError,
   onClose,
@@ -30,27 +42,37 @@ export function AppRenderer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isInternalApp = isInternalAppIframe(iframeUrl);
+
   const sendToIframe = useCallback(
-    (
-      msg: Parameters<
-        typeof createToolInvokeMessage extends (...a: infer P) => infer R ? (...a: P) => R : never
-      >[0] extends string
-        ? ReturnType<typeof createToolInvokeMessage>
-        : never
-    ) => {
+    (msg: ReturnType<typeof createToolInvokeMessage>) => {
       if (iframeRef.current?.contentWindow) {
-        // Use '*' as target origin — works for both internal (same-origin) and external (null-origin) sandboxed iframes.
-        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), '*');
+        const target = getPostMessageTargetForToolInvoke(iframeUrl, window.location.origin);
+        iframeRef.current.contentWindow.postMessage(JSON.stringify(msg), target);
       }
     },
-    []
+    [iframeUrl]
   );
 
-  // Internal apps served from /apps/* run on the platform's own origin and need allow-same-origin
-  // to load their JS/CSS bundles (Next.js SSR pages). External third-party apps must NOT get it.
-  const isInternalApp = iframeUrl.startsWith('/');
+  const relayToolResult = useCallback(
+    (invocationId: string, result: unknown) => {
+      if (!isValidToolInvocationId(invocationId)) {
+        return;
+      }
+      void fetch('/api/tool-invocation-result', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invocationId, result }),
+      }).catch(() => {
+        console.error('[AppRenderer] Failed to relay tool result to server');
+      });
+    },
+    [token]
+  );
 
   useEffect(() => {
+    const onToolResult = onToolResultProp ?? relayToolResult;
+
     const handlers: PostMessageHandler = {
       onToolResult,
       onAppComplete: (summary, data) => {
@@ -64,9 +86,8 @@ export function AppRenderer({
       onHeartbeat: () => {},
     };
 
-    // Internal apps report the platform's origin; external apps (null-origin sandbox) report "null".
-    const expectedOrigin = isInternalApp ? window.location.origin : 'null';
-    const listener = createPostMessageListener(expectedOrigin, handlers, !isInternalApp);
+    const expectedOrigin = getListenerExpectedOrigin(isInternalApp, window.location.origin);
+    const listener = createPostMessageListener(expectedOrigin, handlers, !isInternalApp, sessionId);
 
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== expectedOrigin) return;
@@ -94,18 +115,21 @@ export function AppRenderer({
         setError('App failed to load. Click Retry.');
         setLoading(false);
       },
-      30000
+      IFRAME_LOAD_TIMEOUT_MS
     );
 
     return () => {
       window.removeEventListener('message', handleMessage);
       bufferRef.current?.destroy();
     };
-  }, [onToolResult, onAppComplete, onAppError, sendToIframe, isInternalApp]);
+  }, [onToolResultProp, relayToolResult, onAppComplete, onAppError, sendToIframe, isInternalApp, sessionId]);
 
   if (error) {
     return <ErrorMessage message={error} onRetry={onClose} />;
   }
+
+  const windowOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const iframeSrc = buildIframeSrcWithSession(iframeUrl, sessionId, windowOrigin);
 
   return (
     <div className="relative my-2 overflow-hidden rounded-lg border border-gray-200 transition-all duration-300">
@@ -122,12 +146,8 @@ export function AppRenderer({
       </div>
       <iframe
         ref={iframeRef}
-        src={`${iframeUrl.startsWith('/') ? `${typeof window !== 'undefined' ? window.location.origin : ''}${iframeUrl}` : iframeUrl}${iframeUrl.includes('?') ? '&' : '?'}sessionId=${sessionId}`}
-        sandbox={
-          isInternalApp
-            ? 'allow-scripts allow-forms allow-popups allow-same-origin'
-            : 'allow-scripts allow-forms allow-popups'
-        }
+        src={iframeSrc}
+        sandbox={iframeSandboxAttribute(isInternalApp)}
         referrerPolicy="no-referrer"
         loading="eager"
         title={`${appSlug} app`}

@@ -43,6 +43,7 @@ beforeAll(async () => {
       authType: 'none',
       iframeUrl: 'https://example.com/completion-test',
       status: 'active',
+      approvalStatus: 'approved',
       toolSchemas: [],
     })
     .returning();

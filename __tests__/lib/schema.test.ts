@@ -11,7 +11,7 @@ const db = drizzle(pool, { schema });
 afterAll(async () => {});
 
 describe('database schema', () => {
-  it('has all 8 required tables', async () => {
+  it('has core platform tables including flashcards', async () => {
     const result = await db.execute(sql`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -27,6 +27,16 @@ describe('database schema', () => {
     expect(tables).toContain('oauth_tokens');
     expect(tables).toContain('intents');
     expect(tables).toContain('app_sessions');
+    expect(tables).toContain('study_decks');
+    expect(tables).toContain('study_progress');
+  });
+
+  it('apps table has approval_status column', async () => {
+    const result = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'apps' AND column_name = 'approval_status'
+    `);
+    expect(result.rows.length).toBe(1);
   });
 
   it('users table has correct columns', async () => {

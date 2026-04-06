@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useIframeSessionPostMessage } from '@/lib/iframe-postmessage';
 
 type Card = { front: string; back: string };
 type Deck = { id: string; title: string; description?: string; cards: Card[]; cardCount: number };
@@ -27,11 +28,7 @@ export default function FlashcardsApp() {
   const [results, setResults] = useState<('correct' | 'incorrect')[]>([]);
   const [finished, setFinished] = useState(false);
 
-  const sendToParent = useCallback((msg: Record<string, unknown>) => {
-    if (window.parent !== window) {
-      window.parent.postMessage(JSON.stringify(msg), '*');
-    }
-  }, []);
+  const sendToParent = useIframeSessionPostMessage();
 
   const markCard = useCallback(
     (correct: boolean) => {
@@ -79,8 +76,9 @@ export default function FlashcardsApp() {
       }
 
       if (data.method === 'tool_invoke') {
-        const params = data.params as { tool: string; arguments: Record<string, unknown> };
+        const params = data.params as { tool: string; arguments: Record<string, unknown>; invocationId?: string };
         const id = data.id as number;
+        const invocationId = params.invocationId;
 
         if (params.tool === 'load_deck' || params.tool === 'create_deck') {
           // Parent relays the tool result which contains the deck data
@@ -99,11 +97,11 @@ export default function FlashcardsApp() {
             setFinished(false);
             sendToParent({
               jsonrpc: '2.0',
-              result: { loaded: true, deckId: deckData.deck.id, cardCount: deckData.deck.cardCount },
+              result: { invocationId, loaded: true, deckId: deckData.deck.id, cardCount: deckData.deck.cardCount },
               id,
             });
           } else {
-            sendToParent({ jsonrpc: '2.0', result: { error: 'No deck data received' }, id });
+            sendToParent({ jsonrpc: '2.0', result: { invocationId, error: 'No deck data received' }, id });
           }
         } else if (params.tool === 'answer_card') {
           const result = params.arguments as unknown as {
@@ -112,7 +110,7 @@ export default function FlashcardsApp() {
             cardIndex: number;
             nextCard: number | null;
           };
-          sendToParent({ jsonrpc: '2.0', result, id });
+          sendToParent({ jsonrpc: '2.0', result: { invocationId, ...result }, id });
         }
       }
     };

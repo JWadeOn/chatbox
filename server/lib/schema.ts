@@ -52,7 +52,10 @@ export const apps = pgTable('apps', {
   iframeUrl: varchar('iframe_url', { length: 2048 }).notNull(),
   oauthConfig: jsonb('oauth_config'),
   toolSchemas: jsonb('tool_schemas').default([]).notNull(),
+  /** Legacy visibility flag; prefer `approvalStatus` for governance. Kept for migrations and seeds. */
   status: varchar('status', { length: 20 }).default('active').notNull(),
+  /** Governance: pending (awaiting operator review), approved (student-available), disabled (blocked). */
+  approvalStatus: varchar('approval_status', { length: 20 }).default('pending').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

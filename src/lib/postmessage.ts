@@ -20,10 +20,16 @@ export type PostMessageHandler = {
   onHeartbeat: (timestamp: number) => void;
 };
 
+function paramsSessionOk(params: Record<string, unknown> | undefined, expectedSessionId: string | undefined): boolean {
+  if (!expectedSessionId) return true;
+  return params?.sessionId === expectedSessionId;
+}
+
 export function createPostMessageListener(
   expectedOrigin: string,
   handlers: PostMessageHandler,
-  allowNullOrigin = false
+  allowNullOrigin = false,
+  expectedSessionId?: string
 ) {
   return (event: MessageEvent) => {
     if (event.origin !== expectedOrigin && !(allowNullOrigin && event.origin === 'null')) {
@@ -39,7 +45,16 @@ export function createPostMessageListener(
       return;
     }
 
+    if ('jsonrpc' in msg && msg.jsonrpc !== '2.0') {
+      console.warn('[postmessage] Rejected: jsonrpc must be 2.0');
+      return;
+    }
+
     if ('method' in msg) {
+      if (!paramsSessionOk(msg.params, expectedSessionId)) {
+        console.warn('[postmessage] Session mismatch or missing sessionId on app message');
+        return;
+      }
       switch (msg.method) {
         case 'app_complete':
           handlers.onAppComplete(
@@ -64,8 +79,26 @@ export function createPostMessageListener(
           break;
       }
     } else if ('result' in msg && msg.id !== undefined) {
-      // Tool invocation result
-      handlers.onToolResult(String(msg.id), msg.result);
+      const res = msg.result;
+      if (expectedSessionId) {
+        if (!res || typeof res !== 'object' || Array.isArray(res)) {
+          console.warn('[postmessage] Tool result rejected: expected object with sessionId');
+          return;
+        }
+        const ro = res as Record<string, unknown>;
+        if (ro.sessionId !== expectedSessionId) {
+          console.warn('[postmessage] Tool result session mismatch');
+          return;
+        }
+      }
+      const inv =
+        typeof res === 'object' &&
+        res !== null &&
+        'invocationId' in res &&
+        typeof (res as { invocationId: unknown }).invocationId === 'string'
+          ? (res as { invocationId: string }).invocationId
+          : String(msg.id);
+      handlers.onToolResult(inv, msg.result);
     }
   };
 }

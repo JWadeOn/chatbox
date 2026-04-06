@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useLayoutEffect, useState } from 'react';
 
 type User = {
   id: string;
@@ -25,21 +25,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // useLayoutEffect: resolve “no token” before paint so E2E and users don’t sit on Loading unnecessarily.
+  useLayoutEffect(() => {
+    let cancelled = false;
     const stored = localStorage.getItem('chatbridge_token');
     if (stored) {
       setToken(stored);
-      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${stored}` } })
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 12_000);
+      fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${stored}` },
+        signal: controller.signal,
+      })
         .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((data) => setUser(data.user))
-        .catch(() => {
-          localStorage.removeItem('chatbridge_token');
-          setToken(null);
+        .then((data) => {
+          if (!cancelled) {
+            setUser(data.user);
+          }
         })
-        .finally(() => setLoading(false));
+        .catch(() => {
+          if (!cancelled) {
+            localStorage.removeItem('chatbridge_token');
+            setToken(null);
+          }
+        })
+        .finally(() => {
+          window.clearTimeout(timeoutId);
+          if (!cancelled) {
+            setLoading(false);
+          }
+        });
     } else {
       setLoading(false);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

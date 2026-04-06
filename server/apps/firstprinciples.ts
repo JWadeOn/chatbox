@@ -1,6 +1,8 @@
 export class FirstPrinciplesToolHandler {
+  private lastQuestionBySession = new Map<string, string>();
+
   async handleToolInvoke(
-    _sessionId: string,
+    sessionId: string,
     toolName: string,
     params: Record<string, unknown>
   ): Promise<Record<string, unknown>> {
@@ -13,7 +15,17 @@ export class FirstPrinciplesToolHandler {
       return { error: 'Missing required parameter: question' };
     }
 
+    this.lastQuestionBySession.set(sessionId, question);
     return this.analyze(question);
+  }
+
+  buildAssistantContext(sessionId: string): string {
+    const question = this.lastQuestionBySession.get(sessionId);
+    if (!question) {
+      return '';
+    }
+    const short = question.length > 200 ? `${question.slice(0, 200)}…` : question;
+    return `\n\n## Active App Context\nFirst Principles Tutor: the student is working on this question: "${short}"`;
   }
 
   private analyze(question: string): Record<string, unknown> {
