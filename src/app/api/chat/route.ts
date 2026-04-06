@@ -45,6 +45,7 @@ const TOOL_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 60_000;
 const STUDY_PLANNER_INTENT_RE =
   /\b(study schedule|study session|plan my study|plan .*study|calendar|time block|time-block|schedule my|schedule .*session)\b/i;
+const CHESS_INTENT_RE = /\b(chess|checkmate|opening|tactic|tactics|play chess|chess game)\b/i;
 
 function forceStudyPlannerRouting(
   userContent: string,
@@ -65,6 +66,10 @@ function forceStudyPlannerRouting(
   }
   // Force auth-first path for scheduling intents so users always get OAuth handoff.
   return { appSlug: 'studyplanner', toolName: 'open_planner', args: {} };
+}
+
+function isChessIntent(userContent: string): boolean {
+  return CHESS_INTENT_RE.test(userContent);
 }
 
 /** Execute the actual tool handler with a 15s timeout. */
@@ -131,6 +136,23 @@ export async function POST(request: NextRequest) {
     // Discover registered tools
     const discoveredTools = await toolService.discoverTools();
     const llmTools = toolService.formatForLLM(discoveredTools);
+    const hasApprovedChessTool = discoveredTools.some((t) => t.appSlug === 'chess');
+
+    if (isChessIntent(content) && !hasApprovedChessTool) {
+      const blockedMsg =
+        "Chess isn't available right now because it's pending approval. Ask a teacher/admin to approve it in /admin/apps, or try Khan/Study Planner in the meantime.";
+      await conversationService.addMessage(conversationId, 'assistant', blockedMsg);
+      return new Response(
+        `data: ${JSON.stringify({ content: blockedMsg })}\n\n` + `data: ${JSON.stringify({ done: true })}\n\n`,
+        {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          },
+        }
+      );
+    }
 
     // Build context retention: inject completed app session summaries
     const appSummaryContext = await completionService.buildContextWithSummaries(conversationId);
