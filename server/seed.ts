@@ -36,13 +36,13 @@ const CHESS_APP = {
     {
       name: 'start_game',
       description:
-        'Start a chess game. Modes: tutoring (local board with AI coaching), vs_computer (Stockfish on Lichess), vs_human (multiplayer challenge link).',
+        'Start a chess game. Modes: tutoring (local board with AI coaching), local_computer (local board with automatic opponent), vs_computer (Stockfish on Lichess), vs_human (multiplayer challenge link).',
       parameters: {
         type: 'object',
         properties: {
           mode: {
             type: 'string',
-            enum: ['tutoring', 'vs_computer', 'vs_human'],
+            enum: ['tutoring', 'local_computer', 'vs_computer', 'vs_human'],
             description: 'Game mode (default: tutoring)',
           },
           color: { type: 'string', enum: ['white', 'black'], description: 'Color for the student (default: white)' },

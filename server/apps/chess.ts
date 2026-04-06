@@ -262,11 +262,11 @@ export class ChessToolHandler {
     const mode = (params.mode as string) || 'tutoring';
     const color = (params.color as 'white' | 'black') || 'white';
 
-    if (mode === 'tutoring') {
+    if (mode === 'tutoring' || mode === 'local_computer') {
       const game = new ChessGame();
       const result = game.startGame(color);
       this.games.set(sessionId, game);
-      return result;
+      return { ...result, mode };
     }
 
     const client = this.getLichessClient();
@@ -313,7 +313,7 @@ export class ChessToolHandler {
         };
       }
 
-      return { error: `Unknown mode: ${mode}. Use tutoring, vs_computer, or vs_human.` };
+      return { error: `Unknown mode: ${mode}. Use tutoring, local_computer, vs_computer, or vs_human.` };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Lichess API error';
       return { error: msg };

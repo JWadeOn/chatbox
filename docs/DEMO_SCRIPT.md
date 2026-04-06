@@ -1,230 +1,169 @@
-We # ChatBridge Demo Script
+# ChatBridge Demo Script (3-5 Minutes)
 
-> Covers: 3 working apps, 1 recovery demo, host/app lifecycle walkthrough.
+## Opening (15-20 sec)
 
----
+"ChatBridge turns a chatbot into an orchestrator. Instead of just answering questions, it can invoke third-party apps, embed them inside the chat, track their lifecycle, and resume conversation with context."
 
-## Prerequisites
+"I'll show three working educational apps, one recovery scenario, and then walk through the architecture that makes this possible."
 
-- App running at `http://localhost:3000` (or Render deployment)
-- Demo accounts seeded: `demo@chatbridge.com` / `demo1234` (student), `teacher@chatbridge.com` / `teacher1234` (teacher operator), `admin@chatbridge.com` / `admin1234` (admin operator)
-- All 4 apps registered (chess, khan, studyplanner, firstprinciples)
+## Demo 1: Three Working Apps (2.5-3 min)
 
----
+### 1. Chess — Stateful, Interactive App
 
-## Demo 1: Three Working Apps (5 min)
+Say:
 
-### App 1 -- Chess (Interactive Session)
+"Let's start with a complex, stateful app."
 
-1. Log in as `demo@chatbridge.com`
-2. Start a new conversation
-3. Type: **"Let's play chess! Start a game as white."**
-4. **What happens:**
-   - LLM detects intent, calls `chess__start_game`
-   - ToolRouter creates app_session (status: `active`)
-   - Chess iframe loads at `/apps/chess?sessionId=<uuid>`
-   - Board renders, iframe signals `iframe_ready`
-   - State: `IDLE -> TOOL_REQUESTED -> APP_RENDERED -> ACTIVE`
-5. Make a few moves on the board (click piece, click destination)
-6. Each move sends `app_state_update` via postMessage to host
-7. Type: **"What's a good next move?"** -- LLM reads board state via mid-app context and coaches
-8. Click "Resign" -- app sends `app_complete` with summary
-9. **State: `ACTIVE -> COMPLETED -> IDLE`**
-10. Summary appears in LLM context: *"Player resigned."*
+Action:
+Type: **"Let's play chess"**
 
-### App 2 -- Khan Academy Companion (Topic Exploration)
+Narrate:
 
-1. In a new conversation, type: **"I want to learn about photosynthesis"**
-2. **What happens:**
-   - LLM calls `khan__open_topic` with topic "photosynthesis"
-   - Khan iframe loads, shows topic header
-3. Type: **"Explain the light reactions"**
-   - LLM calls `khan__explain_concept`, explanation card appears
-4. Type: **"Quiz me on this"**
-   - LLM calls `khan__quiz`, multiple-choice quiz appears
-5. Answer the quiz -- result sends `app_state_update`
-6. Click "Done" -- app sends `app_complete` with stats summary
-7. **Key point:** No auth required, session-only state, no persistence
+- "The model selects `chess__start_game`."
+- "Server creates an app session."
+- "Iframe renders inside chat."
 
-### App 3 -- Study Planner (External OAuth)
+Do:
 
-1. In a new conversation, type: **"Plan three 45-minute study sessions for this week"**
-2. **What happens:**
-   - LLM calls `studyplanner__open_planner`
-   - If not connected, iframe shows **Connect Google Calendar** button (OAuth flow)
-   - After auth callback, LLM uses `studyplanner__create_study_session`
-   - Study Planner iframe shows upcoming sessions from Google Calendar
-3. Ask: **"Move my biology session to tomorrow at 7pm"** (creates/adjusts via tool calls)
-4. Ask: **"Show my upcoming study sessions"** (`studyplanner__list_upcoming_sessions`)
-5. **Key point:** This is authenticated third-party API access (OAuth tokens stored per user).
+- Make 1-2 moves.
 
-**Transition callout:** Point out that starting Khan mid-chess-session would have terminated chess (single-active-app rule). Each conversation has at most one active app.
+Ask:
 
----
+- "What should I do here?"
 
-## Demo 2: Recovery (2 min)
+Explain:
 
-### Circuit Breaker + Timeout Recovery
+"The chatbot is reading live board state via `app_state_update` events."
 
-**Setup:** This demo shows what happens when an app fails repeatedly.
+Finish:
 
-1. Open browser dev tools (Network tab) to show requests
-2. Start a conversation and type: **"Analyze why the sky is blue using first principles"**
-3. First Principles app loads and works normally -- circuit breaker state: `closed`
+- Click resign.
 
-**Simulating failure (explain to audience):**
+"The app sends `app_complete`, and the system stores a summary so chat can continue naturally."
 
-The platform has three layers of resilience:
+### 2. Khan Companion — Non-Auth Learning App
 
-**Layer 1 -- Tool Invocation Timeout (15s):**
-- If an app doesn't respond within 15 seconds, the invocation times out
-- ToolRouter calls `handleTimeout()` -- logs the timeout, updates tool_log status
-- LLM receives a recovery prompt: *"The tool timed out. Inform the user and offer to try again."*
-- User sees a friendly message, not a crash
+Say:
 
-**Layer 2 -- Circuit Breaker (3 strikes):**
-- After 3 consecutive failures, the circuit breaker opens
-- All subsequent tool invocations are blocked immediately (fail-fast)
-- LLM gets: *"The app is temporarily unavailable due to repeated failures."*
-- User sees: *"This app is having trouble right now. Try again in about 30 seconds."*
+"Now a non-auth educational app."
 
-**Layer 3 -- Half-Open Recovery (30s):**
-- After 30 seconds, circuit breaker enters `half-open` state
-- Allows one request through as a probe
-- If it succeeds: breaker closes, normal operation resumes
-- If it fails: breaker reopens for another 30s
+Action:
+Type: **"Teach me photosynthesis"**
 
-**Live demo with tests:**
+Narrate:
 
-```bash
-pnpm test -- __tests__/lib/circuit-breaker.test.ts
-pnpm test -- __tests__/lib/error-recovery.test.ts
-```
+- "Model calls `khan__open_topic`."
+- "App loads a guided lesson context."
 
-Show test output proving:
-- `closed -> open` after 3 failures
-- `open -> half-open` after 30s
-- `half-open -> closed` on success
-- Recovery prompts generated for each failure type
+Do:
 
-**Bonus -- Show the code (30 seconds):**
-- `server/lib/circuit-breaker.ts` (52 lines -- simple, auditable)
-- `server/lib/error-recovery.ts` (24 lines -- timeout constants + prompt builders)
-- `server/services/tool-router.service.ts:44` -- circuit breaker check at invocation entry
+Ask: **"Quiz me"**
 
----
+Explain:
 
-## Demo 3: Host/App Lifecycle (3 min)
+"This app is session-based only—no persistence, no auth. It's lightweight but still integrated into chat."
 
-Walk through one complete lifecycle with the audience, using Chess as the example.
+### 3. Study Planner — Authenticated OAuth App
 
-### The Flow (narrate while showing)
+Say:
 
-```
-Step 1: User types "Let's play chess"
-        |
-Step 2: POST /api/chat -> ChatService streams to LLM
-        LLM returns: function_call { name: "chess__start_game", arguments: { color: "white" } }
-        |
-Step 3: ToolRouter.invoke()
-        - Checks circuit breaker: closed? proceed
-        - Validates tool exists via ToolService.discoverTools()
-        - ensureSession(): creates app_sessions row (status: active)
-        - Creates tool_logs entry (status: pending)
-        - State: IDLE -> TOOL_REQUESTED
-        |
-Step 4: Client receives tool call response
-        - AppRenderer creates iframe: /apps/chess?sessionId=<uuid>
-        - Iframe sandbox: allow-scripts allow-forms allow-popups allow-same-origin
-          (internal app, so allow-same-origin is safe)
-        - State: TOOL_REQUESTED -> APP_RENDERED
-        |
-Step 5: Chess iframe loads, calls useIframeSessionPostMessage()
-        - Reads sessionId from URL query param
-        - Sends { method: "iframe_ready", params: { sessionId } }
-        - Retries every 500ms until platform acknowledges
-        - State: APP_RENDERED -> ACTIVE
-        |
-Step 6: Platform relays tool_invoke to iframe
-        - { method: "tool_invoke", params: { tool: "start_game", arguments: { color: "white" }, invocationId } }
-        - Chess app initializes board, returns result with board_fen
-        |
-Step 7: User plays chess (interactive phase)
-        - Clicks pieces, app sends app_state_update with each move
-        - User asks "What should I do?" -> LLM gets active app context (board FEN, move history)
-        - LLM responds as chess coach without new tool call
-        |
-Step 8: Game ends (checkmate, draw, or resign)
-        - App sends { method: "app_complete", params: { sessionId, summary: "Checkmate. White wins in 24 moves." } }
-        - State: ACTIVE -> COMPLETED
-        |
-Step 9: CompletionService.handleComplete()
-        - Updates app_sessions.status = 'completed'
-        - Stores contextSummary (replaces full tool history in LLM context)
-        - Resolves active intent
-        |
-Step 10: State: COMPLETED -> (reset) -> IDLE
-         - Next message: LLM sees summary "Checkmate. White wins in 24 moves."
-         - Full tool invocation history is compacted to one line
-         - Ready for next app invocation
-```
+"Now an authenticated app with real third-party user data."
 
-### Visual: State Machine in Action
+Action:
+Type: **"Plan three 45-minute study sessions for this week"**
 
-```
-  IDLE ----[chess__start_game]----> TOOL_REQUESTED
-                                       |
-                              [iframe loads chess]
-                                       |
-                                  APP_RENDERED
-                                       |
-                              [iframe sends iframe_ready]
-                                       |
-                                    ACTIVE
-                                   /   |   \
-                         [complete] [error] [15s timeout]
-                              |       |         |
-                         COMPLETED  ERROR    TIMEOUT
-                              |       |         |
-                           [reset] [reset]   [reset]
-                              |       |         |
-                             IDLE    IDLE      IDLE
-```
+Narrate:
 
-### Key Architecture Points to Highlight
+- "This uses OAuth with Google Calendar."
+- "If needed, the user connects Google through the auth flow."
+- "Study sessions are created in the user's calendar account."
 
-1. **Server authority:** LLM calls happen server-side only. Client never talks to OpenAI.
-2. **Sandboxed isolation:** Each app runs in its own iframe. External apps get no `allow-same-origin`.
-3. **Context efficiency:** Completed app sessions become one-line summaries, not raw JSON blobs.
-4. **Single-active-app:** Starting a new app terminates the previous one. No resource leaks.
-5. **Idempotent completion:** Duplicate `app_complete` on a completed session is safely ignored.
-6. **Resilience stack:** Timeouts (15s) -> circuit breaker (3 failures) -> recovery prompts -> graceful degradation.
+Do:
 
----
+- Create 1-2 sessions.
+- Ask: **"Show my upcoming study sessions"**
 
-## Test Suite Validation (optional, 1 min)
+Then say:
 
-Run the full test suite to prove everything works:
+"If I come back later and ask again, it persists because it's backed by the external account."
 
-```bash
-pnpm test
-```
+## Transition (5 sec)
 
-Key test files to highlight:
-- `__tests__/lib/invocation-state.test.ts` -- 63 tests covering all state transitions
-- `__tests__/lib/circuit-breaker.test.ts` -- open/half-open/closed + failure counting
-- `__tests__/apps/chess.test.ts` -- move validation, board state, game over
-- `__tests__/apps/khan.test.ts` -- session state, quiz mechanics
-- `__tests__/services/active-app-context.test.ts` -- active app context across app sessions
-- `__tests__/services/tool-router.test.ts` -- invocation flow, single-active-app enforcement
+"So we've shown three distinct K-12 apps: stateful, session-based, and authenticated OAuth."
 
----
+## Demo 2: Recovery (45-60 sec)
 
-## Summary Slide
+Say:
 
-| Deliverable | Where |
-|-------------|-------|
-| 3 working apps | Chess (interactive), Khan (exploration), Study Planner (OAuth) |
-| Recovery demo | Circuit breaker: 3 failures -> open -> 30s -> half-open -> success -> closed |
-| Integration guide | `docs/INTEGRATION_GUIDE.md` -- one page, copy-paste template |
-| Host/app lifecycle | IDLE -> TOOL_REQUESTED -> APP_RENDERED -> ACTIVE -> COMPLETED -> IDLE |
+"Now what happens when things fail?"
+
+Explain clearly (no need to simulate):
+
+"We use a three-layer recovery system:"
+
+1. **Timeout**
+   - "If an app doesn't respond in 15 seconds -> timeout."
+   - "User gets a graceful message."
+2. **Circuit breaker**
+   - "After 3 failures -> app is temporarily disabled."
+   - "Requests fail fast."
+3. **Recovery**
+   - "After 30 seconds -> system retries automatically."
+
+"This prevents cascading failures when thousands of students hit the system at once."
+
+## Demo 3: Architecture (1-1.5 min)
+
+### Core Idea
+
+"The hard problem is the boundary between chat and apps."
+
+"We solve this with a standardized app contract + server orchestration layer."
+
+### Lifecycle
+
+"Every app follows the same lifecycle:"
+
+`IDLE -> TOOL_REQUESTED -> APP_RENDERED -> ACTIVE -> COMPLETED -> IDLE`
+
+### Flow (talk through Chess)
+
+"User says 'play chess' -> LLM selects tool -> server validates and routes -> iframe renders -> app communicates via postMessage -> completion is explicitly signaled -> chat resumes with summary."
+
+### Trust & Safety
+
+"All apps are untrusted by default."
+
+Key points:
+
+- sandboxed iframes
+- no direct credential access
+- strict message validation
+- data minimization
+- app approval workflow (teachers approve apps)
+
+"We don't rely on full visual moderation—instead we enforce safety at the boundary and through human approval."
+
+### Key Architecture Decisions
+
+- server owns all LLM + tool routing
+- apps communicate via JSON-RPC over postMessage
+- summaries replace raw state for efficiency
+- single active app per conversation
+
+## Closing (15-20 sec)
+
+"ChatBridge transforms chat from a passive interface into an orchestration platform."
+
+"It supports unknown third-party apps through a standardized contract, maintains state across interactions, and enforces safety through both technical boundaries and human governance."
+
+"That's how we solve the core case study problem."
+
+## What this demo proves (implicitly)
+
+- 3 working apps
+- real orchestration (not just embedding)
+- lifecycle handling
+- recovery strategy
+- trust & safety model
+- technical depth

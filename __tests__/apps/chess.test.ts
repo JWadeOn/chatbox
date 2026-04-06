@@ -230,6 +230,15 @@ describe('ChessToolHandler', () => {
       expect(result.player_color).toBe('black');
     });
 
+    it('start_game supports local_computer mode', async () => {
+      const handler = new ChessToolHandler();
+      const result = await handler.handleToolInvoke('session-local', 'start_game', { mode: 'local_computer' });
+
+      expect(result.mode).toBe('local_computer');
+      expect(result.status).toBe('in_progress');
+      expect(result.board_fen).toBeDefined();
+    });
+
     it('make_move with valid move', async () => {
       const handler = new ChessToolHandler();
       await handler.handleToolInvoke('session-3', 'start_game', {});
