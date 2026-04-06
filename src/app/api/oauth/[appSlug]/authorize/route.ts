@@ -16,8 +16,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { userId } = authService.verifyToken(token);
 
     const conversationId = request.nextUrl.searchParams.get('conversationId') ?? '';
+    const redirectBaseUrl = process.env.OAUTH_REDIRECT_BASE_URL || request.nextUrl.origin;
 
-    const { url } = oauthService.generateAuthUrl(appSlug, userId, conversationId);
+    const { url } = oauthService.generateAuthUrl(appSlug, userId, conversationId, redirectBaseUrl);
 
     return NextResponse.json({ url });
   } catch (error) {

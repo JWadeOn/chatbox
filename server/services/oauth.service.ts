@@ -8,6 +8,7 @@ type OAuthState = {
   conversationId: string;
   appSlug: string;
   nonce: string;
+  redirectBaseUrl: string;
 };
 
 type OAuthConfig = {
@@ -37,15 +38,26 @@ export class OAuthService {
     this.cleanupTimer.unref();
   }
 
-  generateAuthUrl(appSlug: string, userId: string, conversationId: string): { url: string; nonce: string } {
+  generateAuthUrl(
+    appSlug: string,
+    userId: string,
+    conversationId: string,
+    redirectBaseUrl?: string
+  ): { url: string; nonce: string } {
     const nonce = crypto.randomUUID();
     this.pendingNonces.set(nonce, Date.now() + NONCE_TTL_MS);
+    const resolvedRedirectBaseUrl =
+      redirectBaseUrl ||
+      process.env.OAUTH_REDIRECT_BASE_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      'http://localhost:3000';
 
     const state: OAuthState = {
       userId,
       conversationId,
       appSlug,
       nonce,
+      redirectBaseUrl: resolvedRedirectBaseUrl,
     };
 
     const encodedState = Buffer.from(JSON.stringify(state)).toString('base64');
@@ -62,7 +74,7 @@ export class OAuthService {
       response_type: 'code',
       client_id: config.clientId,
       scope: config.scopes.join(' '),
-      redirect_uri: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/oauth/${appSlug}/callback`,
+      redirect_uri: `${resolvedRedirectBaseUrl}/api/oauth/${appSlug}/callback`,
       state: encodedState,
     });
 
@@ -94,7 +106,7 @@ export class OAuthService {
       if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
         throw new OAuthError('Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.', 501);
       }
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      const baseUrl = decoded.redirectBaseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
       const tokenResponse = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

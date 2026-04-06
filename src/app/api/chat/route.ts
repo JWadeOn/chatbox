@@ -282,6 +282,16 @@ An external authenticated app for planning study time in Google Calendar. Use st
               });
 
               if (!routeResult.success) {
+                if (
+                  appSlug === 'chess' &&
+                  typeof routeResult.error === 'string' &&
+                  routeResult.error.toLowerCase().includes('not found')
+                ) {
+                  const blockedMsg =
+                    "Chess isn't available right now because it's pending approval. Ask a teacher/admin to approve it in /admin/apps.";
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: blockedMsg })}\n\n`));
+                  await conversationService.addMessage(conversationId, 'assistant', blockedMsg);
+                }
                 // Circuit breaker open or tool not found
                 controller.enqueue(
                   encoder.encode(
@@ -366,6 +376,16 @@ An external authenticated app for planning study time in Google Calendar. Use st
 
               // Add tool result to context
               messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+
+              const resultObj = result as Record<string, unknown>;
+              if (appSlug === 'studyplanner' && resultObj?.needsAuth === true) {
+                const authMsg =
+                  "Study Planner needs Google Calendar access. Use the 'Connect Google Calendar' button in the embedded panel to authenticate.";
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: authMsg })}\n\n`));
+                await conversationService.addMessage(conversationId, 'assistant', authMsg);
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+                return;
+              }
             }
 
             // Get next LLM response with tool results

@@ -14,8 +14,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const result = await oauthService.handleCallback(appSlug, code, state);
 
-    // Redirect back to the conversation
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Redirect back to the conversation on the same host that handled the callback.
+    const baseUrl = request.nextUrl.origin;
     return NextResponse.redirect(`${baseUrl}/conversations/${result.conversationId}?oauth=success`);
   } catch (error) {
     if (error instanceof OAuthError) {
