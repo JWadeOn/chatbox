@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
+import { APP_APPROVAL_APPROVED, APP_APPROVAL_PENDING } from './lib/app-approval';
 import { db, pool } from './lib/db';
 import { apps, users } from './lib/schema';
 
@@ -208,7 +209,10 @@ const FIRST_PRINCIPLES_APP = {
 
 const ALL_APPS = [CHESS_APP, KHAN_APP, FLASHCARDS_APP, FIRST_PRINCIPLES_APP];
 
-async function upsertSeedUser(user: { email: string; password: string; displayName: string; role: string }, label: string) {
+async function upsertSeedUser(
+  user: { email: string; password: string; displayName: string; role: string },
+  label: string
+) {
   const [existing] = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
   if (existing) {
     console.info(`${label} already exists, skipping.`);
@@ -246,9 +250,12 @@ async function seed() {
     }
   }
 
-  // Seed apps
+  // Seed apps — chess stays **pending** for operator demo (approve in /admin/apps); others approved.
   for (const app of ALL_APPS) {
     console.info(`Seeding ${app.slug} app...`);
+    const chessDemoPending = app.slug === 'chess';
+    const approvalStatus = chessDemoPending ? APP_APPROVAL_PENDING : APP_APPROVAL_APPROVED;
+    const status = chessDemoPending ? 'inactive' : 'active';
     const [existing] = await db.select().from(apps).where(eq(apps.slug, app.slug)).limit(1);
     if (existing) {
       await db
@@ -256,19 +263,23 @@ async function seed() {
         .set({
           toolSchemas: app.toolSchemas,
           description: app.description,
-          status: 'active',
-          approvalStatus: 'approved',
+          status,
+          approvalStatus,
           updatedAt: new Date(),
         })
         .where(eq(apps.id, existing.id));
-      console.info(`${app.slug} app updated with latest schemas.`);
+      console.info(
+        `${app.slug} app updated (${chessDemoPending ? 'pending approval — use /admin/apps' : 'approved'}).`
+      );
     } else {
       await db.insert(apps).values({
         ...app,
-        status: 'active',
-        approvalStatus: 'approved',
+        status,
+        approvalStatus,
       });
-      console.info(`${app.slug} app registered.`);
+      console.info(
+        `${app.slug} app registered (${chessDemoPending ? 'pending approval — use /admin/apps' : 'approved'}).`
+      );
     }
   }
 

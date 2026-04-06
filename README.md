@@ -55,6 +55,8 @@ These accounts are created by `pnpm db:seed` (skip any row that already exists).
 
 **Student** — default chat and app usage. **Teacher** and **admin** are **operators**: they may call `POST /api/apps/register`, `GET /api/apps/pending`, and `PATCH /api/apps/:slug` (approve/disable). New app registrations start as **pending** until an operator approves them.
 
+**App approvals UI:** Sign in as teacher or admin, open **App approvals** in the sidebar, or go to `/admin/apps`. After `pnpm db:seed`, the **Chess** app is **pending** so you can demo approve/reject; other seeded apps are already approved. Approving Chess exposes its tools in student chat; **Reject** sets the app to **disabled**.
+
 You can also register a new account from the login page (new users get the `student` role).
 
 ## Architecture

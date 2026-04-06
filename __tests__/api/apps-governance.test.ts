@@ -7,6 +7,7 @@ import { db } from '../../server/lib/db';
 import { apps, users } from '../../server/lib/schema';
 import { appService } from '../../server/services/app.service';
 import { GET as getAppBySlug, PATCH as patchAppBySlug } from '../../src/app/api/apps/[slug]/route';
+import { GET as getPendingApps } from '../../src/app/api/apps/pending/route';
 import { POST as registerApp } from '../../src/app/api/apps/register/route';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
@@ -72,6 +73,27 @@ describe('App governance API', () => {
     await db.delete(users).where(eq(users.id, studentUserId));
   });
 
+  it('GET /api/apps/pending returns 403 for student', async () => {
+    const res = await getPendingApps(
+      new NextRequest('http://localhost/api/apps/pending', {
+        headers: { Authorization: `Bearer ${studentToken}` },
+      })
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /api/apps/pending returns pending apps for admin', async () => {
+    const res = await getPendingApps(
+      new NextRequest('http://localhost/api/apps/pending', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const slugs = (body.apps as { slug: string }[]).map((a) => a.slug);
+    expect(slugs).toContain(pendingSlug);
+  });
+
   it('POST /api/apps/register returns 401 without auth', async () => {
     const req = new NextRequest('http://localhost/api/apps/register', {
       method: 'POST',
@@ -127,6 +149,28 @@ describe('App governance API', () => {
       params: Promise.resolve({ slug: pendingSlug }),
     });
     expect(res.status).toBe(404);
+  });
+
+  it('PATCH /api/apps/[slug] can reject (disable) pending app', async () => {
+    const rejectSlug = `gov-reject-${Date.now()}`;
+    await appService.register({
+      slug: rejectSlug,
+      name: 'Reject Me',
+      description: 'To be disabled',
+      authType: 'none',
+      iframeUrl: 'https://example.com/reject',
+      toolSchemas: [{ name: 'x', description: 'x', parameters: { type: 'object', properties: {} } }],
+    });
+    const patchReq = new NextRequest(`http://localhost/api/apps/${rejectSlug}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approvalStatus: 'disabled' }),
+    });
+    const patchRes = await patchAppBySlug(patchReq, { params: Promise.resolve({ slug: rejectSlug }) });
+    expect(patchRes.status).toBe(200);
+    const patchBody = await patchRes.json();
+    expect(patchBody.app?.approvalStatus).toBe('disabled');
+    await db.delete(apps).where(eq(apps.slug, rejectSlug));
   });
 
   it('GET /api/apps/[slug] returns 200 after operator PATCH approves', async () => {

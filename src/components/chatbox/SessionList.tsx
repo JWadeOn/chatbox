@@ -14,8 +14,11 @@
 
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+
+const OPERATOR_ROLES = new Set(['admin', 'teacher']);
 
 type Conversation = {
   id: string;
@@ -65,6 +68,14 @@ export function SessionList({ activeId, onSelect, onNew }: SessionListProps) {
           <span className="text-base leading-none">+</span>
           <span>New Chat</span>
         </button>
+        {user && OPERATOR_ROLES.has(user.role) && (
+          <Link
+            href="/admin/apps"
+            className="mt-3 flex w-full items-center justify-center rounded-2xl border border-white/15 px-3 py-2.5 text-xs font-medium text-[rgba(214,225,241,0.92)] transition hover:bg-white/10"
+          >
+            App approvals
+          </Link>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
