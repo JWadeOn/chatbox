@@ -62,8 +62,15 @@ export class FlashcardsToolHandler {
       .returning();
 
     return {
-      deck: { id: deck.id, title: deck.title, cardCount: deck.cardCount },
+      deck: {
+        id: deck.id,
+        title: deck.title,
+        description: deck.description,
+        cards,
+        cardCount: deck.cardCount,
+      },
       status: 'created',
+      currentCard: 0,
     };
   }
 

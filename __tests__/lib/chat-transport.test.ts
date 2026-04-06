@@ -8,7 +8,7 @@ describe('parseSseChunk', () => {
     expect(first.remainder).toBe('data: {"type":"app_render","appSlug":"chess"');
 
     const second = parseSseChunk(
-      ',"iframeUrl":"/apps/chess","sessionId":"session-1"}\n\n',
+      ',"iframeUrl":"/apps/chess","sessionId":"session-1","invocationId":"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d","toolName":"start_game","toolArgs":{},"toolResult":{}}\n\n',
       first.remainder
     );
 
@@ -19,6 +19,10 @@ describe('parseSseChunk', () => {
         appSlug: 'chess',
         iframeUrl: '/apps/chess',
         sessionId: 'session-1',
+        invocationId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+        toolName: 'start_game',
+        toolArgs: {},
+        toolResult: {},
       },
     ]);
   });

@@ -3,6 +3,7 @@ import type { ChessToolHandler } from '../apps/chess';
 import type { FirstPrinciplesToolHandler } from '../apps/firstprinciples';
 import type { FlashcardsToolHandler } from '../apps/flashcards';
 import type { KhanToolHandler } from '../apps/khan';
+import type { StudyPlannerToolHandler } from '../apps/studyplanner';
 import { db } from '../lib/db';
 import { appSessions, apps } from '../lib/schema';
 
@@ -11,6 +12,7 @@ type Handlers = {
   khan: KhanToolHandler;
   flashcards: FlashcardsToolHandler;
   firstprinciples: FirstPrinciplesToolHandler;
+  studyplanner: StudyPlannerToolHandler;
 };
 
 /**
@@ -48,6 +50,8 @@ export async function buildActiveAppContextForConversation(
       return handlers.flashcards.buildAssistantContext(sessionId);
     case 'firstprinciples':
       return handlers.firstprinciples.buildAssistantContext(sessionId);
+    case 'studyplanner':
+      return handlers.studyplanner.buildAssistantContext(sessionId);
     default:
       return '';
   }

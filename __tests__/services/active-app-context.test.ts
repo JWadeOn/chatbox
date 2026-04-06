@@ -4,6 +4,7 @@ import { ChessToolHandler } from '../../server/apps/chess';
 import { FirstPrinciplesToolHandler } from '../../server/apps/firstprinciples';
 import { FlashcardsToolHandler } from '../../server/apps/flashcards';
 import { KhanToolHandler } from '../../server/apps/khan';
+import { StudyPlannerToolHandler } from '../../server/apps/studyplanner';
 import { APP_APPROVAL_APPROVED } from '../../server/lib/app-approval';
 import { db } from '../../server/lib/db';
 import { apps, conversations, toolLogs, users } from '../../server/lib/schema';
@@ -16,6 +17,7 @@ describe('buildActiveAppContextForConversation', () => {
   const khanHandler = new KhanToolHandler();
   const flashcardsHandler = new FlashcardsToolHandler();
   const firstHandler = new FirstPrinciplesToolHandler();
+  const studyPlannerHandler = new StudyPlannerToolHandler();
   const router = new ToolRouter();
 
   let userId: string;
@@ -51,7 +53,10 @@ describe('buildActiveAppContextForConversation', () => {
     });
     expect(inv.success).toBe(true);
     expect(inv.sessionId).toBeDefined();
-    await chessHandler.handleToolInvoke(inv.sessionId!, 'start_game', { mode: 'tutoring' });
+    if (!inv.sessionId) {
+      throw new Error('Missing sessionId from tool router invoke');
+    }
+    await chessHandler.handleToolInvoke(inv.sessionId, 'start_game', { mode: 'tutoring' });
   });
 
   afterAll(async () => {
@@ -66,6 +71,7 @@ describe('buildActiveAppContextForConversation', () => {
       khan: khanHandler,
       flashcards: flashcardsHandler,
       firstprinciples: firstHandler,
+      studyplanner: studyPlannerHandler,
     });
     expect(ctx).toContain('Active App Context');
     expect(ctx).toContain('FEN:');

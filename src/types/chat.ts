@@ -57,6 +57,13 @@ export type AppEmbedState = {
   appSlug: string;
   iframeUrl: string;
   sessionId: string;
+  /** Initial tool_invoke relayed into the iframe after iframe_ready (merged args + server result). */
+  iframeToolRelay: {
+    invocationId: string;
+    toolName: string;
+    toolArgs: Record<string, unknown>;
+    toolResult: unknown;
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -76,6 +83,10 @@ export type StreamEventAppRender = {
   appSlug: string;
   iframeUrl: string;
   sessionId: string;
+  invocationId: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+  toolResult: unknown;
 };
 
 export type StreamEventContent = {

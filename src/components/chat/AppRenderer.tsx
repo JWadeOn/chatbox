@@ -13,12 +13,26 @@ import {
   isValidToolInvocationId,
 } from '@/lib/iframe-bridge';
 import { InvocationBuffer } from '@/lib/invocation-buffer';
-import { createPostMessageListener, type createToolInvokeMessage, type PostMessageHandler } from '@/lib/postmessage';
+import { createPostMessageListener, createToolInvokeMessage, type PostMessageHandler } from '@/lib/postmessage';
+
+function mergeIframeToolArguments(toolArgs: Record<string, unknown>, toolResult: unknown): Record<string, unknown> {
+  if (toolResult && typeof toolResult === 'object' && !Array.isArray(toolResult)) {
+    return { ...toolArgs, ...(toolResult as Record<string, unknown>) };
+  }
+  return { ...toolArgs };
+}
 
 type AppRendererProps = {
   appSlug: string;
   iframeUrl: string;
   sessionId: string;
+  /** Merged into the initial tool_invoke sent to the iframe after iframe_ready. */
+  iframeToolRelay: {
+    invocationId: string;
+    toolName: string;
+    toolArgs: Record<string, unknown>;
+    toolResult: unknown;
+  };
   token: string;
   /** Optional override; default relays UUID `invocationId` to `/api/tool-invocation-result`. */
   onToolResult?: (invocationId: string, result: unknown) => void;
@@ -31,6 +45,7 @@ export function AppRenderer({
   appSlug,
   iframeUrl,
   sessionId,
+  iframeToolRelay,
   token,
   onToolResult: onToolResultProp,
   onAppComplete,
@@ -109,7 +124,7 @@ export function AppRenderer({
 
     window.addEventListener('message', handleMessage);
 
-    bufferRef.current = new InvocationBuffer(
+    const buffer = new InvocationBuffer(
       (msg) => sendToIframe(msg as ReturnType<typeof createToolInvokeMessage>),
       () => {
         setError('App failed to load. Click Retry.');
@@ -117,12 +132,34 @@ export function AppRenderer({
       },
       IFRAME_LOAD_TIMEOUT_MS
     );
+    bufferRef.current = buffer;
+
+    if (
+      iframeToolRelay.invocationId &&
+      isValidToolInvocationId(iframeToolRelay.invocationId) &&
+      iframeToolRelay.toolName
+    ) {
+      const merged = mergeIframeToolArguments(iframeToolRelay.toolArgs, iframeToolRelay.toolResult);
+      buffer.enqueue(createToolInvokeMessage(iframeToolRelay.toolName, merged, iframeToolRelay.invocationId));
+    }
 
     return () => {
       window.removeEventListener('message', handleMessage);
       bufferRef.current?.destroy();
     };
-  }, [onToolResultProp, relayToolResult, onAppComplete, onAppError, sendToIframe, isInternalApp, sessionId]);
+  }, [
+    iframeToolRelay.invocationId,
+    iframeToolRelay.toolArgs,
+    iframeToolRelay.toolName,
+    iframeToolRelay.toolResult,
+    onToolResultProp,
+    relayToolResult,
+    onAppComplete,
+    onAppError,
+    sendToIframe,
+    isInternalApp,
+    sessionId,
+  ]);
 
   if (error) {
     return <ErrorMessage message={error} onRetry={onClose} />;

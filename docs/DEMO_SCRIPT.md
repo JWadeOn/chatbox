@@ -8,7 +8,7 @@ We # ChatBridge Demo Script
 
 - App running at `http://localhost:3000` (or Render deployment)
 - Demo accounts seeded: `demo@chatbridge.com` / `demo1234` (student), `teacher@chatbridge.com` / `teacher1234` (teacher operator), `admin@chatbridge.com` / `admin1234` (admin operator)
-- All 4 apps registered (chess, khan, flashcards, firstprinciples)
+- All 4 apps registered (chess, khan, studyplanner, firstprinciples)
 
 ---
 
@@ -46,16 +46,17 @@ We # ChatBridge Demo Script
 6. Click "Done" -- app sends `app_complete` with stats summary
 7. **Key point:** No auth required, session-only state, no persistence
 
-### App 3 -- Flashcards (Platform-Authenticated)
+### App 3 -- Study Planner (External OAuth)
 
-1. In a new conversation, type: **"Create a flashcard deck about the solar system with 5 cards"**
+1. In a new conversation, type: **"Plan three 45-minute study sessions for this week"**
 2. **What happens:**
-   - LLM calls `flashcards__create_deck` -- requires logged-in user (platform auth)
-   - Server creates deck in `study_decks` table scoped to userId
-   - Flashcards iframe loads, shows first card
-3. Click card to flip, press "Got it" or "Missed it"
-4. Complete all 5 cards -- app sends `app_complete` with score
-5. **Key point:** User data persists across sessions. Type **"Load my solar system deck"** later and it's still there.
+   - LLM calls `studyplanner__open_planner`
+   - If not connected, iframe shows **Connect Google Calendar** button (OAuth flow)
+   - After auth callback, LLM uses `studyplanner__create_study_session`
+   - Study Planner iframe shows upcoming sessions from Google Calendar
+3. Ask: **"Move my biology session to tomorrow at 7pm"** (creates/adjusts via tool calls)
+4. Ask: **"Show my upcoming study sessions"** (`studyplanner__list_upcoming_sessions`)
+5. **Key point:** This is authenticated third-party API access (OAuth tokens stored per user).
 
 **Transition callout:** Point out that starting Khan mid-chess-session would have terminated chess (single-active-app rule). Each conversation has at most one active app.
 
@@ -214,7 +215,7 @@ Key test files to highlight:
 - `__tests__/lib/circuit-breaker.test.ts` -- open/half-open/closed + failure counting
 - `__tests__/apps/chess.test.ts` -- move validation, board state, game over
 - `__tests__/apps/khan.test.ts` -- session state, quiz mechanics
-- `__tests__/apps/flashcards.test.ts` -- deck CRUD, progress tracking
+- `__tests__/services/active-app-context.test.ts` -- active app context across app sessions
 - `__tests__/services/tool-router.test.ts` -- invocation flow, single-active-app enforcement
 
 ---
@@ -223,7 +224,7 @@ Key test files to highlight:
 
 | Deliverable | Where |
 |-------------|-------|
-| 3 working apps | Chess (interactive), Khan (exploration), Flashcards (authenticated) |
+| 3 working apps | Chess (interactive), Khan (exploration), Study Planner (OAuth) |
 | Recovery demo | Circuit breaker: 3 failures -> open -> 30s -> half-open -> success -> closed |
 | Integration guide | `docs/INTEGRATION_GUIDE.md` -- one page, copy-paste template |
 | Host/app lifecycle | IDLE -> TOOL_REQUESTED -> APP_RENDERED -> ACTIVE -> COMPLETED -> IDLE |

@@ -77,6 +77,21 @@ function buildSummary(appSlug: string, toolName: string, result: Record<string, 
     return `Analyzed: ${result.question}`;
   }
 
+  // Study Planner (Google Calendar)
+  if (appSlug === 'studyplanner') {
+    if (toolName === 'open_planner') {
+      return result.needsAuth ? 'Google Calendar connection required' : 'Opened study planner';
+    }
+    if (toolName === 'create_study_session') {
+      const session = result.session as { title?: string } | undefined;
+      return `Planned study session: ${session?.title ?? 'Untitled'}`;
+    }
+    if (toolName === 'list_upcoming_sessions') {
+      const sessions = result.sessions as unknown[] | undefined;
+      return `Loaded ${sessions?.length ?? 0} upcoming study sessions`;
+    }
+  }
+
   return `${toolName} completed`;
 }
 

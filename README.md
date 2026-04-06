@@ -138,10 +138,10 @@ Non-authenticated educational companion for guided topic exploration. Students o
 
 **Tools:** `khan__open_topic`, `khan__explain_concept`, `khan__quiz`
 
-### Flashcards (Active Recall Study)
-Platform-authenticated study app with user-specific decks and progress tracking. Students create decks from chat, work through cards in the iframe with flip/score mechanics, and track mastery over time. Auth is platform-owned (JWT) -- no external OAuth in MVP. User-specific data is gated by authenticated identity.
+### Study Planner (Google Calendar OAuth)
+External authenticated app for study planning. Students connect Google Calendar through OAuth, create focused study blocks from chat, and review upcoming sessions directly in the iframe. Access is per-user and token-backed.
 
-**Tools:** `flashcards__create_deck`, `flashcards__load_deck`, `flashcards__answer_card`, `flashcards__get_progress`
+**Tools:** `studyplanner__open_planner`, `studyplanner__create_study_session`, `studyplanner__list_upcoming_sessions`
 
 ### First Principles Tutor (Critical Thinking) -- Bonus
 Structured reasoning tool that decomposes questions into assumptions, first principles, reasoning steps, and conclusions. Students submit a question and receive a structured analysis they can discuss with the chatbot afterward.

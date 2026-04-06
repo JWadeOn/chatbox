@@ -19,7 +19,7 @@ import { IconChevronRight } from './SidebarToggleIcons';
 const SUGGESTIONS = [
   { label: "Let's play chess", icon: '\u265E' },
   { label: 'Teach me about photosynthesis', icon: '\u{1F4D6}' },
-  { label: 'Create flashcards for vocabulary', icon: '\u{1F4DD}' },
+  { label: 'Plan my study schedule for this week', icon: '\u{1F4C5}' },
   { label: 'Break down: Why is the sky blue?', icon: '\u{1F9E0}' },
 ];
 
@@ -118,6 +118,7 @@ export function ChatWindow({ conversationId, token, onExpandConversationList }: 
               appSlug={appEmbed.appSlug}
               iframeUrl={appEmbed.iframeUrl}
               sessionId={appEmbed.sessionId}
+              iframeToolRelay={appEmbed.iframeToolRelay}
               token={token}
               onAppComplete={(summary, data) => handleAppComplete(summary, data)}
               onAppError={(message, recoverable) => handleAppError(message, recoverable)}

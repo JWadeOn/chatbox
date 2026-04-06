@@ -118,69 +118,46 @@ const KHAN_APP = {
   ],
 };
 
-const FLASHCARDS_APP = {
-  slug: 'flashcards',
-  name: 'Flashcards',
-  description: 'Create and study flashcard decks for active recall practice with progress tracking',
-  authType: 'none',
-  iframeUrl: '/apps/flashcards',
+const STUDY_PLANNER_APP = {
+  slug: 'studyplanner',
+  name: 'Study Planner (Google Calendar)',
+  description: 'Plan and track study sessions in Google Calendar with OAuth-based per-user access',
+  authType: 'oauth',
+  iframeUrl: '/apps/studyplanner',
   toolSchemas: [
     {
-      name: 'load_deck',
-      description: 'Load a flashcard deck by ID for the current user to study.',
+      name: 'open_planner',
+      description: 'Open the study planner and check whether Google Calendar is connected for this user.',
       parameters: {
         type: 'object',
-        properties: {
-          deckId: { type: 'string', description: 'The deck UUID to load' },
-        },
-        required: ['deckId'],
+        properties: {},
       },
     },
     {
-      name: 'create_deck',
-      description: 'Create a new flashcard deck with a title and array of cards.',
+      name: 'create_study_session',
+      description: 'Create a study session event in Google Calendar.',
       parameters: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: 'Title for the deck' },
-          cards: {
-            type: 'array',
-            description: 'Array of card objects with front and back text',
-            items: {
-              type: 'object',
-              properties: {
-                front: { type: 'string', description: 'Front of card (question/term)' },
-                back: { type: 'string', description: 'Back of card (answer/definition)' },
-              },
-              required: ['front', 'back'],
-            },
+          title: { type: 'string', description: 'Study session title, e.g. "Biology review"' },
+          startIso: {
+            type: 'string',
+            description: 'Start datetime in ISO-8601 format, e.g. 2026-04-08T19:00:00-04:00',
           },
+          durationMinutes: { type: 'number', description: 'Session duration in minutes (10-240)' },
+          notes: { type: 'string', description: 'Optional notes or goals for the session' },
         },
-        required: ['title', 'cards'],
+        required: ['title', 'startIso'],
       },
     },
     {
-      name: 'answer_card',
-      description: 'Submit an answer for the current flashcard and check correctness.',
+      name: 'list_upcoming_sessions',
+      description: 'List upcoming study sessions from Google Calendar.',
       parameters: {
         type: 'object',
         properties: {
-          deckId: { type: 'string', description: 'The deck UUID' },
-          cardIndex: { type: 'number', description: 'Index of the card being answered' },
-          answer: { type: 'string', description: 'The student answer' },
+          limit: { type: 'number', description: 'How many upcoming sessions to return (default 10, max 20)' },
         },
-        required: ['deckId', 'cardIndex', 'answer'],
-      },
-    },
-    {
-      name: 'get_progress',
-      description: 'Get study progress history for a flashcard deck.',
-      parameters: {
-        type: 'object',
-        properties: {
-          deckId: { type: 'string', description: 'The deck UUID' },
-        },
-        required: ['deckId'],
       },
     },
   ],
@@ -207,7 +184,7 @@ const FIRST_PRINCIPLES_APP = {
   ],
 };
 
-const ALL_APPS = [CHESS_APP, KHAN_APP, FLASHCARDS_APP, FIRST_PRINCIPLES_APP];
+const ALL_APPS = [CHESS_APP, KHAN_APP, STUDY_PLANNER_APP, FIRST_PRINCIPLES_APP];
 
 async function upsertSeedUser(
   user: { email: string; password: string; displayName: string; role: string },
@@ -239,7 +216,7 @@ async function seed() {
   await upsertSeedUser(DEMO_ADMIN, 'Demo admin');
 
   // Deactivate old apps that are no longer in the spec
-  for (const slug of ['weather', 'spotify']) {
+  for (const slug of ['weather', 'spotify', 'flashcards']) {
     const [old] = await db.select().from(apps).where(eq(apps.slug, slug)).limit(1);
     if (old && old.status === 'active') {
       await db

@@ -4,6 +4,7 @@ import { ChessToolHandler } from '../../../../server/apps/chess';
 import { FirstPrinciplesToolHandler } from '../../../../server/apps/firstprinciples';
 import { FlashcardsToolHandler } from '../../../../server/apps/flashcards';
 import { KhanToolHandler } from '../../../../server/apps/khan';
+import { StudyPlannerToolHandler } from '../../../../server/apps/studyplanner';
 import { logEvent } from '../../../../server/lib/logger';
 import { toolRateLimiter } from '../../../../server/lib/rate-limiter';
 import { authErrorResponse, extractAuth } from '../../../../server/middleware/auth.middleware';
@@ -20,6 +21,7 @@ const chessHandler = new ChessToolHandler();
 const khanHandler = new KhanToolHandler();
 const flashcardsHandler = new FlashcardsToolHandler();
 const firstPrinciplesHandler = new FirstPrinciplesToolHandler();
+const studyPlannerHandler = new StudyPlannerToolHandler();
 
 // App iframe URLs for app_render events
 const APP_IFRAME_URLS: Record<string, string> = {
@@ -27,6 +29,7 @@ const APP_IFRAME_URLS: Record<string, string> = {
   khan: '/apps/khan',
   flashcards: '/apps/flashcards',
   firstprinciples: '/apps/firstprinciples',
+  studyplanner: '/apps/studyplanner',
 };
 
 // Which tool calls should trigger an app_render
@@ -35,6 +38,7 @@ const APP_RENDER_TRIGGERS: Record<string, string[]> = {
   khan: ['open_topic'],
   flashcards: ['load_deck', 'create_deck'],
   firstprinciples: ['analyze'],
+  studyplanner: ['open_planner', 'create_study_session', 'list_upcoming_sessions'],
 };
 
 const TOOL_TIMEOUT_MS = 15_000;
@@ -59,6 +63,8 @@ async function executeToolHandler(
         return flashcardsHandler.handleToolInvoke(sessionId, toolName, args, userId);
       case 'firstprinciples':
         return firstPrinciplesHandler.handleToolInvoke(sessionId, toolName, args);
+      case 'studyplanner':
+        return studyPlannerHandler.handleToolInvoke(sessionId, toolName, args, userId, _conversationId);
       default:
         return Promise.resolve({ error: `No handler for app: ${appSlug}` });
     }
@@ -112,6 +118,7 @@ export async function POST(request: NextRequest) {
       khan: khanHandler,
       flashcards: flashcardsHandler,
       firstprinciples: firstPrinciplesHandler,
+      studyplanner: studyPlannerHandler,
     });
 
     const systemPrompt = `You are an educational assistant on the TutorMeAI platform, helping K-12 students learn through interactive tools and conversation.
@@ -137,11 +144,11 @@ For Lichess modes, use chess__get_board_state to check game status when asked, a
 ### Khan Academy Companion (Topic Exploration)
 A topic companion for exploring any subject. Use khan__open_topic with a topic name to open a lesson view. Use khan__explain_concept with a concept to get a student-friendly explanation. Use khan__quiz to generate a quiz question on the current topic. Guide the student through topics, encourage curiosity, and help them test their understanding.
 
-### Flashcards (Active Recall Study)
-A flashcard study tool for active recall practice. Use flashcards__create_deck with a title and cards array (each card has front and back) to create a new deck. Use flashcards__load_deck with a deckId to load an existing deck. Use flashcards__answer_card to check answers and flashcards__get_progress to review study history. Help students create effective flashcards and use spaced repetition principles.
-
 ### First Principles Tutor (Critical Thinking)
 A critical thinking tool that breaks down questions into first principles. Use firstprinciples__analyze with a question or problem to decompose it into assumptions, foundational principles, and step-by-step reasoning. Help students see the structure behind complex questions and develop analytical thinking skills.
+
+### Study Planner (Google Calendar OAuth)
+An external authenticated app for planning study time in Google Calendar. Use studyplanner__open_planner first; if auth is required, ask the student to connect Google. Use studyplanner__create_study_session to schedule blocks and studyplanner__list_upcoming_sessions to review upcoming sessions.
 
 ## Rules
 - Only invoke tools when the student's request clearly matches a tool's purpose.
@@ -240,7 +247,12 @@ A critical thinking tool that breaks down questions into first principles. Use f
 
               // 2. Execute the actual tool handler (with 15s timeout)
               logEvent(
-                { event: 'tool_invocation_dispatched', invocationId: invocationId ?? undefined, sessionId, conversationId },
+                {
+                  event: 'tool_invocation_dispatched',
+                  invocationId: invocationId ?? undefined,
+                  sessionId,
+                  conversationId,
+                },
                 { appSlug, toolName }
               );
               let result: unknown;
@@ -268,9 +280,9 @@ A critical thinking tool that breaks down questions into first principles. Use f
                 encoder.encode(`data: ${JSON.stringify({ type: 'tool_call', appSlug, toolName, args, result })}\n\n`)
               );
 
-              // Send app_render for apps that have a UI component
+              // Send app_render for apps that have a UI component (includes tool relay for iframe)
               const triggers = APP_RENDER_TRIGGERS[appSlug];
-              if (triggers?.includes(toolName) && APP_IFRAME_URLS[appSlug]) {
+              if (invocationId && triggers?.includes(toolName) && APP_IFRAME_URLS[appSlug]) {
                 // Append tool result as URL-encoded query params so the iframe can read them on mount
                 const resultObj = result as Record<string, unknown>;
                 const extraParams = new URLSearchParams();
@@ -289,6 +301,10 @@ A critical thinking tool that breaks down questions into first principles. Use f
                       appSlug,
                       iframeUrl: iframeUrlWithResult,
                       sessionId,
+                      invocationId,
+                      toolName,
+                      toolArgs: args,
+                      toolResult: result,
                     })}\n\n`
                   )
                 );

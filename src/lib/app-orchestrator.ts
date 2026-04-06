@@ -42,6 +42,12 @@ export function useAppOrchestrator() {
         appSlug: event.appSlug,
         iframeUrl: event.iframeUrl,
         sessionId: event.sessionId,
+        iframeToolRelay: {
+          invocationId: event.invocationId,
+          toolName: event.toolName,
+          toolArgs: event.toolArgs,
+          toolResult: event.toolResult,
+        },
       };
       setAppEmbed(session);
       emit({ type: 'app_rendered', session });

@@ -15,6 +15,7 @@ type OAuthConfig = {
   tokenUrl: string;
   scopes: string[];
   clientId: string;
+  clientSecret?: string;
 };
 
 const NONCE_TTL_MS = 10 * 60_000; // 10 minutes
@@ -83,11 +84,50 @@ export class OAuthService {
     // Consume the nonce (one-time use)
     this.pendingNonces.delete(decoded.nonce);
 
-    // In a real implementation, we'd exchange `code` for tokens via the token endpoint.
-    // For MVP, we mock the token exchange and store mock tokens.
     const appRecord = await this.getAppBySlug(appSlug);
-    if (appRecord) {
-      const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+    if (!appRecord) {
+      throw new OAuthError('App not found', 404);
+    }
+
+    const config = this.getOAuthConfig(appSlug);
+    if (appSlug === 'studyplanner') {
+      if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
+        throw new OAuthError('Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.', 501);
+      }
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      const tokenResponse = await fetch(config.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          redirect_uri: `${baseUrl}/api/oauth/${appSlug}/callback`,
+          grant_type: 'authorization_code',
+        }),
+      });
+      if (!tokenResponse.ok) {
+        const body = await tokenResponse.text();
+        throw new OAuthError(`OAuth token exchange failed (${tokenResponse.status}): ${body.slice(0, 220)}`, 502);
+      }
+      const tokens = (await tokenResponse.json()) as {
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+      };
+      if (!tokens.access_token) {
+        throw new OAuthError('OAuth token exchange returned no access token.', 502);
+      }
+      const expiresAt = tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null;
+      await this.storeTokens(
+        decoded.userId,
+        appRecord.id,
+        tokens.access_token,
+        tokens.refresh_token,
+        expiresAt ?? undefined
+      );
+    } else {
+      const expiresAt = new Date(Date.now() + 3600 * 1000);
       await this.storeTokens(decoded.userId, appRecord.id, `mock-access-${code}`, `mock-refresh-${code}`, expiresAt);
     }
 
@@ -119,6 +159,64 @@ export class OAuthService {
     return { authenticated: true };
   }
 
+  async getValidAccessToken(userId: string, appSlug: string): Promise<string | null> {
+    const appRecord = await this.getAppBySlug(appSlug);
+    if (!appRecord) return null;
+
+    const [token] = await db
+      .select()
+      .from(oauthTokens)
+      .where(and(eq(oauthTokens.userId, userId), eq(oauthTokens.appId, appRecord.id)))
+      .limit(1);
+    if (!token) return null;
+
+    const now = Date.now();
+    const expiryMs = token.expiresAt ? token.expiresAt.getTime() : now + 60_000;
+    if (expiryMs - now > 60_000) {
+      return token.accessToken;
+    }
+
+    if (!token.refreshToken) {
+      return null;
+    }
+
+    const config = this.getOAuthConfig(appSlug);
+    if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
+      return null;
+    }
+
+    const response = await fetch(config.tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        refresh_token: token.refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const refreshed = (await response.json()) as {
+      access_token?: string;
+      expires_in?: number;
+      refresh_token?: string;
+    };
+    if (!refreshed.access_token) return null;
+
+    const expiresAt = refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : null;
+    await this.storeTokens(
+      userId,
+      appRecord.id,
+      refreshed.access_token,
+      refreshed.refresh_token ?? token.refreshToken ?? undefined,
+      expiresAt ?? undefined
+    );
+    return refreshed.access_token;
+  }
+
   async storeTokens(
     userId: string,
     appId: string,
@@ -147,10 +245,18 @@ export class OAuthService {
   }
 
   private getOAuthConfig(appSlug: string): OAuthConfig {
-    // Default configs for known apps. In production, these come from the apps table.
-    // No hardcoded OAuth configs in MVP — apps use platform auth.
-    // When external OAuth is added post-MVP, register configs here.
-    const configs: Record<string, OAuthConfig> = {};
+    const configs: Record<string, OAuthConfig> = {
+      studyplanner: {
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        scopes: [
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/calendar.readonly',
+        ],
+        clientId: process.env.GOOGLE_CLIENT_ID || '',
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      },
+    };
 
     return (
       configs[appSlug] ?? {

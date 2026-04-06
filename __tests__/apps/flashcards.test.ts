@@ -78,9 +78,11 @@ describe('FlashcardsToolHandler', () => {
       );
 
       expect(result.status).toBe('created');
-      const deck = result.deck as { id: string; title: string; cardCount: number };
+      expect(result.currentCard).toBe(0);
+      const deck = result.deck as { id: string; title: string; cards: unknown[]; cardCount: number };
       expect(deck.title).toBe('Biology Terms');
       expect(deck.cardCount).toBe(2);
+      expect(deck.cards).toHaveLength(2);
       createdDeckId = deck.id;
     });
 
