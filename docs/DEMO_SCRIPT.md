@@ -6,8 +6,8 @@ We # ChatBridge Demo Script
 
 ## Prerequisites
 
-- App running at `http://localhost:3000` (or Railway deployment)
-- Demo accounts seeded: `demo@chatbridge.com` / `demo1234` (student), `admin@chatbridge.com` / `admin1234` (operator)
+- App running at `http://localhost:3000` (or Render deployment)
+- Demo accounts seeded: `demo@chatbridge.com` / `demo1234` (student), `teacher@chatbridge.com` / `teacher1234` (teacher operator), `admin@chatbridge.com` / `admin1234` (admin operator)
 - All 4 apps registered (chess, khan, flashcards, firstprinciples)
 
 ---

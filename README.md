@@ -50,6 +50,7 @@ After running `pnpm db:seed`:
 | Account | Email | Password |
 |---------|-------|----------|
 | Student (demo) | `demo@chatbridge.com` | `demo1234` |
+| Teacher (operator: app registration & approval) | `teacher@chatbridge.com` | `teacher1234` |
 | Admin (app governance) | `admin@chatbridge.com` | `admin1234` |
 
 The admin account can call `POST /api/apps/register`, `GET /api/apps/pending`, and `PATCH /api/apps/:slug` (approve/disable). New app registrations start as **pending** until an operator approves them.

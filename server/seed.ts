@@ -3,11 +3,18 @@ import { eq } from 'drizzle-orm';
 import { db, pool } from './lib/db';
 import { apps, users } from './lib/schema';
 
-const DEMO_USER = {
+const DEMO_STUDENT = {
   email: 'demo@chatbridge.com',
   password: 'demo1234',
-  displayName: 'Demo User',
+  displayName: 'Demo Student',
   role: 'student',
+};
+
+const DEMO_TEACHER = {
+  email: 'teacher@chatbridge.com',
+  password: 'teacher1234',
+  displayName: 'Demo Teacher',
+  role: 'teacher',
 };
 
 const DEMO_ADMIN = {
@@ -201,36 +208,31 @@ const FIRST_PRINCIPLES_APP = {
 
 const ALL_APPS = [CHESS_APP, KHAN_APP, FLASHCARDS_APP, FIRST_PRINCIPLES_APP];
 
-async function seed() {
-  // Seed demo user
-  console.info('Seeding demo user...');
-  const existingUser = await db.select().from(users).where(eq(users.email, DEMO_USER.email)).limit(1);
-  if (existingUser.length > 0) {
-    console.info('Demo user already exists, skipping.');
-  } else {
-    const passwordHash = await bcrypt.hash(DEMO_USER.password, 10);
-    await db.insert(users).values({
-      email: DEMO_USER.email,
-      passwordHash,
-      displayName: DEMO_USER.displayName,
-      role: DEMO_USER.role,
-    });
-    console.info('Demo user created: demo@chatbridge.com / demo1234');
+async function upsertSeedUser(user: { email: string; password: string; displayName: string; role: string }, label: string) {
+  const [existing] = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
+  if (existing) {
+    console.info(`${label} already exists, skipping.`);
+    return;
   }
+  const passwordHash = await bcrypt.hash(user.password, 10);
+  await db.insert(users).values({
+    email: user.email,
+    passwordHash,
+    displayName: user.displayName,
+    role: user.role,
+  });
+  console.info(`${label} created: ${user.email} / ${user.password}`);
+}
 
-  const existingAdmin = await db.select().from(users).where(eq(users.email, DEMO_ADMIN.email)).limit(1);
-  if (existingAdmin.length > 0) {
-    console.info('Demo admin already exists, skipping.');
-  } else {
-    const adminHash = await bcrypt.hash(DEMO_ADMIN.password, 10);
-    await db.insert(users).values({
-      email: DEMO_ADMIN.email,
-      passwordHash: adminHash,
-      displayName: DEMO_ADMIN.displayName,
-      role: DEMO_ADMIN.role,
-    });
-    console.info('Demo admin created: admin@chatbridge.com / admin1234 (app registration & approval)');
-  }
+async function seed() {
+  console.info('Seeding demo student...');
+  await upsertSeedUser(DEMO_STUDENT, 'Demo student');
+
+  console.info('Seeding demo teacher...');
+  await upsertSeedUser(DEMO_TEACHER, 'Demo teacher');
+
+  console.info('Seeding demo admin...');
+  await upsertSeedUser(DEMO_ADMIN, 'Demo admin');
 
   // Deactivate old apps that are no longer in the spec
   for (const slug of ['weather', 'spotify']) {
