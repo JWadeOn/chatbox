@@ -22,6 +22,10 @@ type OAuthConfig = {
 const NONCE_TTL_MS = 10 * 60_000; // 10 minutes
 const NONCE_CLEANUP_INTERVAL_MS = 60_000; // 1 minute
 
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '');
+}
+
 export class OAuthService {
   // Track valid nonces for CSRF protection with expiry timestamps
   private pendingNonces = new Map<string, number>();
@@ -46,11 +50,12 @@ export class OAuthService {
   ): { url: string; nonce: string } {
     const nonce = crypto.randomUUID();
     this.pendingNonces.set(nonce, Date.now() + NONCE_TTL_MS);
-    const resolvedRedirectBaseUrl =
+    const resolvedRedirectBaseUrlRaw =
       redirectBaseUrl ||
       process.env.OAUTH_REDIRECT_BASE_URL ||
       process.env.NEXT_PUBLIC_BASE_URL ||
       'http://localhost:3000';
+    const resolvedRedirectBaseUrl = normalizeBaseUrl(resolvedRedirectBaseUrlRaw);
 
     const state: OAuthState = {
       userId,
@@ -106,7 +111,9 @@ export class OAuthService {
       if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
         throw new OAuthError('Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.', 501);
       }
-      const baseUrl = decoded.redirectBaseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      const baseUrl = normalizeBaseUrl(
+        decoded.redirectBaseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+      );
       const tokenResponse = await fetch(config.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

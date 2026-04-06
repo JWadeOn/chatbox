@@ -123,7 +123,7 @@ export default function StudyPlannerApp() {
             {authUrl ? (
               <a
                 href={authUrl}
-                target="_top"
+                target="_blank"
                 rel="noreferrer"
                 style={{
                   display: 'inline-block',
