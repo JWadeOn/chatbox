@@ -43,19 +43,19 @@ pnpm db:seed
 pnpm dev
 ```
 
-### Demo Credentials
+### Demo users
 
-After running `pnpm db:seed`:
+These accounts are created by `pnpm db:seed` (skip any row that already exists). Use them for local testing or after seeding a shared environment.
 
-| Account | Email | Password |
-|---------|-------|----------|
-| Student (demo) | `demo@chatbridge.com` | `demo1234` |
-| Teacher (operator: app registration & approval) | `teacher@chatbridge.com` | `teacher1234` |
-| Admin (app governance) | `admin@chatbridge.com` | `admin1234` |
+| Display name | Role | Email | Password |
+|--------------|------|-------|----------|
+| Demo Student | `student` | `demo@chatbridge.com` | `demo1234` |
+| Demo Teacher | `teacher` | `teacher@chatbridge.com` | `teacher1234` |
+| Demo Admin | `admin` | `admin@chatbridge.com` | `admin1234` |
 
-The admin account can call `POST /api/apps/register`, `GET /api/apps/pending`, and `PATCH /api/apps/:slug` (approve/disable). New app registrations start as **pending** until an operator approves them.
+**Student** — default chat and app usage. **Teacher** and **admin** are **operators**: they may call `POST /api/apps/register`, `GET /api/apps/pending`, and `PATCH /api/apps/:slug` (approve/disable). New app registrations start as **pending** until an operator approves them.
 
-Or register a new account from the login page.
+You can also register a new account from the login page (new users get the `student` role).
 
 ## Architecture
 
@@ -269,7 +269,7 @@ sandbox="allow-scripts allow-forms allow-popups"
 | `lint:fix` | `pnpm lint:fix` | Auto-fix lint/format |
 | `typecheck` | `pnpm typecheck` | TypeScript type check |
 | `db:push` | `pnpm db:push` | Push schema to database |
-| `db:seed` | `pnpm db:seed` | Seed demo user + apps |
+| `db:seed` | `pnpm db:seed` | Seed demo users (student, teacher, admin) + apps |
 | `db:generate` | `pnpm db:generate` | Generate Drizzle migrations |
 | `db:studio` | `pnpm db:studio` | Open Drizzle Studio GUI |
 
@@ -288,7 +288,7 @@ Deployed on **Railway** with Docker. The `railway.toml` and `Dockerfile` are inc
 - `DB_POOL_MAX` -- database connection pool size (default: `20`)
 - `LOG_LEVEL` -- pino log level (default: `info`)
 
-After deploying, run against the production database:
+After deploying, run against the production database (see **Demo users** for seeded logins):
 ```bash
 DATABASE_URL="<railway-url>" pnpm db:push
 DATABASE_URL="<railway-url>" pnpm db:seed
