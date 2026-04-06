@@ -53,7 +53,7 @@ export class OAuthService {
     const config = this.getOAuthConfig(appSlug);
     if (!config.clientId?.trim()) {
       throw new OAuthError(
-        'OAuth is not configured for this app. Flashcards and platform auth use your ChatBridge login; external OAuth is optional.',
+        'OAuth is not configured for this app. Add provider credentials in environment variables and try again.',
         501
       );
     }

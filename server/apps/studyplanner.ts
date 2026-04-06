@@ -58,13 +58,22 @@ export class StudyPlannerToolHandler {
   private async openPlanner(userId: string, conversationId: string): Promise<Record<string, unknown>> {
     const token = await oauthService.getValidAccessToken(userId, 'studyplanner');
     if (!token) {
-      const { url } = oauthService.generateAuthUrl('studyplanner', userId, conversationId);
-      return {
-        status: 'auth_required',
-        needsAuth: true,
-        authUrl: url,
-        message: 'Connect your Google account to plan study sessions.',
-      };
+      try {
+        const { url } = oauthService.generateAuthUrl('studyplanner', userId, conversationId);
+        return {
+          status: 'auth_required',
+          needsAuth: true,
+          authUrl: url,
+          message: 'Connect your Google account to plan study sessions.',
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'OAuth configuration error';
+        return {
+          status: 'error',
+          error: message,
+          needsAuth: false,
+        };
+      }
     }
     const sessions = await this.fetchUpcoming(token, 10);
     return {

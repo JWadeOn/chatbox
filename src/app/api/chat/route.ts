@@ -50,10 +50,14 @@ function forceStudyPlannerRouting(
   userContent: string,
   appSlug: string,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  hasStudyPlannerTool: boolean
 ): { appSlug: string; toolName: string; args: Record<string, unknown> } {
   const likelyPlannerIntent = STUDY_PLANNER_INTENT_RE.test(userContent);
   if (!likelyPlannerIntent) {
+    return { appSlug, toolName, args };
+  }
+  if (!hasStudyPlannerTool) {
     return { appSlug, toolName, args };
   }
   if (appSlug === 'studyplanner') {
@@ -220,7 +224,10 @@ An external authenticated app for planning study time in Google Calendar. Use st
 
               const [rawAppSlug, rawToolName] = tc.function.name.split('__');
               const rawArgs = JSON.parse(tc.function.arguments || '{}');
-              const routed = forceStudyPlannerRouting(content, rawAppSlug, rawToolName, rawArgs);
+              const hasStudyPlannerTool = discoveredTools.some(
+                (t) => t.namespacedName === 'studyplanner__open_planner'
+              );
+              const routed = forceStudyPlannerRouting(content, rawAppSlug, rawToolName, rawArgs, hasStudyPlannerTool);
               const appSlug = routed.appSlug;
               const toolName = routed.toolName;
               const args = routed.args;

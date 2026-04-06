@@ -17,6 +17,7 @@ export default function StudyPlannerApp() {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [status, setStatus] = useState('Waiting for planner data...');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -36,11 +37,18 @@ export default function StudyPlannerApp() {
       const invocationId = params.invocationId;
       const args = params.arguments ?? {};
 
-      if (args.needsAuth) {
+      if (typeof args.error === 'string' && args.error.trim().length > 0) {
+        setNeedsAuth(false);
+        setAuthUrl(null);
+        setError(args.error);
+        setStatus('Planner setup error');
+      } else if (args.needsAuth) {
+        setError(null);
         setNeedsAuth(true);
         setAuthUrl(typeof args.authUrl === 'string' ? args.authUrl : null);
         setStatus(typeof args.message === 'string' ? args.message : 'Connect Google Calendar to continue.');
       } else {
+        setError(null);
         setNeedsAuth(false);
         setAuthUrl(null);
         if (Array.isArray(args.sessions)) {
@@ -83,6 +91,21 @@ export default function StudyPlannerApp() {
       <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
         <div style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Study Planner</div>
         <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{status}</div>
+        {error ? (
+          <div
+            style={{
+              marginTop: '10px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#b91c1c',
+              borderRadius: '8px',
+              padding: '10px',
+              fontSize: '12px',
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
 
         {needsAuth ? (
           <div
