@@ -1,5 +1,8 @@
 GENERAL PRESEARCH -> PRD -> TECHNICAL PRESEARCH -> Spec -> CLAUDE.md
 
+StepAnswersAudienceFeeds IntoGeneral PresearchWhat's out there? Who needs this? Is it worth building?Product / businessPRDPRDWhat are we building and why?Everyone — alignment docTechnical PresearchTechnical PresearchWhat are our implementation options? Which should we pick?EngineeringSpecSpecHow exactly are we building it?Engineers + AI agentsCLAUDE.mdCLAUDE.mdWhat does Claude Code need to know?Claude CodeThe codebase
+
+
 Presearch: answers "What's out there and what's possble?"
 
 PRD: (Product Requirements Document) answers "What are we building and why?"
