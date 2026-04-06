@@ -14,6 +14,33 @@ type TransportCallbacks = {
   onDone: () => void;
 };
 
+type ParsedSseChunk = {
+  events: StreamEvent[];
+  remainder: string;
+};
+
+export function parseSseChunk(chunk: string, buffered = '', flush = false): ParsedSseChunk {
+  const combined = `${buffered}${chunk}`;
+  const lines = combined.split('\n');
+  const remainder = flush || combined.endsWith('\n') ? '' : (lines.pop() ?? '');
+  const events: StreamEvent[] = [];
+
+  for (const line of lines) {
+    if (!line.startsWith('data: ')) continue;
+
+    const json = line.slice(6).trim();
+    if (!json) continue;
+
+    try {
+      events.push(JSON.parse(json) as StreamEvent);
+    } catch {
+      // Ignore malformed complete lines, but preserve incomplete trailing lines via remainder.
+    }
+  }
+
+  return { events, remainder };
+}
+
 /** Fetch conversation history from the server. */
 export async function fetchConversation(conversationId: string, token: string): Promise<{ messages: ServerMessage[] }> {
   const res = await fetch(`/api/conversations/${conversationId}`, {
@@ -62,28 +89,32 @@ export function streamChatMessage(
       }
 
       const decoder = new TextDecoder();
+      let bufferedText = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const text = decoder.decode(value, { stream: true });
-        const lines = text.split('\n');
+        const parsed = parseSseChunk(text, bufferedText);
+        bufferedText = parsed.remainder;
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const json = line.slice(6);
-          try {
-            const data = JSON.parse(json) as StreamEvent;
-            if ('done' in data && data.done) {
-              callbacks.onDone();
-              return;
-            }
-            callbacks.onEvent(data);
-          } catch {
-            // Skip malformed chunks
+        for (const data of parsed.events) {
+          if ('done' in data && data.done) {
+            callbacks.onDone();
+            return;
           }
+          callbacks.onEvent(data);
         }
+      }
+
+      const flushed = parseSseChunk(decoder.decode(), bufferedText, true);
+      for (const data of flushed.events) {
+        if ('done' in data && data.done) {
+          callbacks.onDone();
+          return;
+        }
+        callbacks.onEvent(data);
       }
 
       callbacks.onDone();
