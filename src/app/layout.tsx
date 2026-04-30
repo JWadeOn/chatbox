@@ -3,8 +3,8 @@ import { AuthProvider } from '@/lib/auth-context';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Truth Layer',
-  description: 'Real-time probabilities for the world’s events',
+  title: 'ChatBridge',
+  description: 'AI chat platform with third-party app integration',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const baseUrl = result.redirectBaseUrl || publicOrigin;
 
     console.info('[oauth/callback] appSlug=%s origin=%s publicOrigin=%s baseUrl=%s', appSlug, request.nextUrl.origin, publicOrigin, baseUrl);
-    return NextResponse.redirect(`${baseUrl}/conversations/${result.conversationId}?oauth=success`);
+    return NextResponse.redirect(`${baseUrl}/?oauth=success&conversationId=${result.conversationId}`);
   } catch (error) {
     if (error instanceof OAuthError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
