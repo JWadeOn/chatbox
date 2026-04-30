@@ -89,6 +89,14 @@ app.prepare().then(() => {
   const _wsManager = new WSManager(server);
 
   server.listen(port, () => {
-    logger.info({ port, env: process.env.NODE_ENV || 'development' }, `ChatBridge server ready on port ${port}`);
+    logger.info(
+      {
+        port,
+        env: process.env.NODE_ENV || 'development',
+        OAUTH_REDIRECT_BASE_URL: process.env.OAUTH_REDIRECT_BASE_URL || '(not set)',
+        NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || '(not set)',
+      },
+      'ChatBridge server ready'
+    );
   });
 });

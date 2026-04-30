@@ -9,7 +9,10 @@ type OAuthState = {
   appSlug: string;
   nonce: string;
   redirectBaseUrl: string;
+  createdAt: number;
 };
+
+type SignedOAuthState = OAuthState & { sig: string };
 
 type OAuthConfig = {
   authorizationUrl: string;
@@ -19,28 +22,40 @@ type OAuthConfig = {
   clientSecret?: string;
 };
 
-const NONCE_TTL_MS = 10 * 60_000; // 10 minutes
-const NONCE_CLEANUP_INTERVAL_MS = 60_000; // 1 minute
+const STATE_TTL_MS = 10 * 60_000; // 10 minutes
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '');
 }
 
-export class OAuthService {
-  // Track valid nonces for CSRF protection with expiry timestamps
-  private pendingNonces = new Map<string, number>();
-  private cleanupTimer: ReturnType<typeof setInterval>;
+function getSigningSecret(): string {
+  return process.env.JWT_SECRET || 'dev-secret';
+}
 
-  constructor() {
-    // Periodically evict expired nonces to prevent memory leaks
-    this.cleanupTimer = setInterval(() => {
-      const now = Date.now();
-      for (const [nonce, expiresAt] of this.pendingNonces) {
-        if (now > expiresAt) this.pendingNonces.delete(nonce);
-      }
-    }, NONCE_CLEANUP_INTERVAL_MS);
-    this.cleanupTimer.unref();
+function signState(state: OAuthState): string {
+  const payload = JSON.stringify(state);
+  const sig = crypto.createHmac('sha256', getSigningSecret()).update(payload).digest('hex');
+  const signed: SignedOAuthState = { ...state, sig };
+  return Buffer.from(JSON.stringify(signed)).toString('base64');
+}
+
+function verifyAndDecodeState(encoded: string): OAuthState {
+  const signed = JSON.parse(Buffer.from(encoded, 'base64').toString()) as SignedOAuthState;
+  const { sig, ...state } = signed;
+
+  const expectedSig = crypto.createHmac('sha256', getSigningSecret()).update(JSON.stringify(state)).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    throw new OAuthError('Invalid OAuth state signature', 403);
   }
+
+  if (Date.now() - state.createdAt > STATE_TTL_MS) {
+    throw new OAuthError('OAuth state expired — please try connecting again', 403);
+  }
+
+  return state;
+}
+
+export class OAuthService {
 
   generateAuthUrl(
     appSlug: string,
@@ -49,7 +64,6 @@ export class OAuthService {
     redirectBaseUrl?: string
   ): { url: string; nonce: string } {
     const nonce = crypto.randomUUID();
-    this.pendingNonces.set(nonce, Date.now() + NONCE_TTL_MS);
     const resolvedRedirectBaseUrlRaw =
       redirectBaseUrl ||
       process.env.OAUTH_REDIRECT_BASE_URL ||
@@ -57,15 +71,26 @@ export class OAuthService {
       'http://localhost:3000';
     const resolvedRedirectBaseUrl = normalizeBaseUrl(resolvedRedirectBaseUrlRaw);
 
+    console.info(
+      '[OAuthService.generateAuthUrl] appSlug=%s redirectBaseUrl=%s (raw=%s, arg=%s, OAUTH_REDIRECT_BASE_URL=%s, NEXT_PUBLIC_BASE_URL=%s)',
+      appSlug,
+      resolvedRedirectBaseUrl,
+      resolvedRedirectBaseUrlRaw,
+      redirectBaseUrl ?? '(none)',
+      process.env.OAUTH_REDIRECT_BASE_URL ?? '(not set)',
+      process.env.NEXT_PUBLIC_BASE_URL ?? '(not set)'
+    );
+
     const state: OAuthState = {
       userId,
       conversationId,
       appSlug,
       nonce,
       redirectBaseUrl: resolvedRedirectBaseUrl,
+      createdAt: Date.now(),
     };
 
-    const encodedState = Buffer.from(JSON.stringify(state)).toString('base64');
+    const encodedState = signState(state);
 
     const config = this.getOAuthConfig(appSlug);
     if (!config.clientId?.trim()) {
@@ -88,18 +113,9 @@ export class OAuthService {
     return { url, nonce };
   }
 
-  async handleCallback(appSlug: string, code: string, stateParam: string): Promise<{ conversationId: string }> {
-    // Decode and validate state
-    const decoded = JSON.parse(Buffer.from(stateParam, 'base64').toString()) as OAuthState;
-
-    const nonceExpiry = this.pendingNonces.get(decoded.nonce);
-    if (!nonceExpiry || Date.now() > nonceExpiry) {
-      this.pendingNonces.delete(decoded.nonce);
-      throw new OAuthError('Invalid or expired nonce', 403);
-    }
-
-    // Consume the nonce (one-time use)
-    this.pendingNonces.delete(decoded.nonce);
+  async handleCallback(appSlug: string, code: string, stateParam: string): Promise<{ conversationId: string; redirectBaseUrl: string }> {
+    // Verify HMAC signature and decode state (stateless — survives restarts)
+    const decoded = verifyAndDecodeState(stateParam);
 
     const appRecord = await this.getAppBySlug(appSlug);
     if (!appRecord) {
@@ -150,7 +166,7 @@ export class OAuthService {
       await this.storeTokens(decoded.userId, appRecord.id, `mock-access-${code}`, `mock-refresh-${code}`, expiresAt);
     }
 
-    return { conversationId: decoded.conversationId };
+    return { conversationId: decoded.conversationId, redirectBaseUrl: decoded.redirectBaseUrl };
   }
 
   async getTokenStatus(userId: string, appSlug: string): Promise<{ authenticated: boolean }> {

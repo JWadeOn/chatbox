@@ -16,7 +16,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { userId } = authService.verifyToken(token);
 
     const conversationId = request.nextUrl.searchParams.get('conversationId') ?? '';
-    const redirectBaseUrl = process.env.OAUTH_REDIRECT_BASE_URL || request.nextUrl.origin;
+
+    // Railway (and similar proxies) forward the public host/proto via headers.
+    // request.nextUrl.origin reflects the internal listener (localhost:3000), not the public URL.
+    const forwardedHost = request.headers.get('x-forwarded-host');
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+    const publicOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : request.nextUrl.origin;
+
+    const redirectBaseUrl = process.env.OAUTH_REDIRECT_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || publicOrigin;
+
+    console.info('[oauth/authorize] appSlug=%s origin=%s publicOrigin=%s redirectBaseUrl=%s', appSlug, request.nextUrl.origin, publicOrigin, redirectBaseUrl);
 
     const { url } = oauthService.generateAuthUrl(appSlug, userId, conversationId, redirectBaseUrl);
 

@@ -14,8 +14,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const result = await oauthService.handleCallback(appSlug, code, state);
 
-    // Redirect back to the conversation on the same host that handled the callback.
-    const baseUrl = request.nextUrl.origin;
+    // Use the redirect base URL from the OAuth state, which reflects the public-facing origin.
+    // request.nextUrl.origin resolves to the internal proxy address (localhost:3000) on Railway.
+    const forwardedHost = request.headers.get('x-forwarded-host');
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+    const publicOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : request.nextUrl.origin;
+    const baseUrl = result.redirectBaseUrl || publicOrigin;
+
+    console.info('[oauth/callback] appSlug=%s origin=%s publicOrigin=%s baseUrl=%s', appSlug, request.nextUrl.origin, publicOrigin, baseUrl);
     return NextResponse.redirect(`${baseUrl}/conversations/${result.conversationId}?oauth=success`);
   } catch (error) {
     if (error instanceof OAuthError) {
