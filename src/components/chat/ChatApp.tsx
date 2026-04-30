@@ -4,7 +4,7 @@
  * ChatApp — top-level chat shell composing Chatbox-derived sidebar and chat window.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SessionList } from '@/components/chatbox/SessionList';
 import { useAuth } from '@/lib/auth-context';
 import { ChatWindow } from './ChatWindow';
@@ -14,6 +14,17 @@ export function ChatApp() {
   const { token } = useAuth();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Resume conversation after OAuth redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const convId = params.get('conversationId');
+    if (convId) {
+      setActiveConversationId(convId);
+      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   const handleNew = useCallback(async () => {
     if (!token) return;
